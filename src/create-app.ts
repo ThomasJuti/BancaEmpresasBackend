@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
+import helmetImport from 'helmet';
 import { errorHandler } from './shared/middlewares/error-handler.js';
 import { notFoundHandler } from './shared/middlewares/not-found.js';
 import { registerFeatureRoutes } from './routes.js';
@@ -8,6 +8,10 @@ import { docsRouter } from './infrastructure/docs/docs.routes.js';
 
 export function createApp() {
   const app = express();
+  const helmet =
+    typeof helmetImport === 'function'
+      ? helmetImport
+      : (helmetImport as unknown as { default: typeof helmetImport }).default;
 
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(cors());

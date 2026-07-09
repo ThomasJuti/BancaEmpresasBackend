@@ -1,15 +1,22 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api" }
+  ],
   "functions": {
-    "src/server.ts": {
+    "api/index.ts": {
       "maxDuration": 60
     }
   },
   "crons": [
     {
       "path": "/api/delivery-confirmation/cron/process-due",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/sales-calls/cron/dispatch",
+      "schedule": "0 12 * * *"
     }
   ]
 }

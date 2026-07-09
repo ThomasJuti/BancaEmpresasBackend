@@ -17,6 +17,13 @@ info:
     | `GET` | `/api/sales-calls/calls` | Lista las llamadas registradas |
     | `GET` | `/api/sales-calls/calls/{id}` | Detalle de una llamada (transcript, análisis) |
     | `GET` | `/api/sales-calls/calls/{id}/recording` | Proxy de la grabación de audio (con Range) |
+    | `GET` | `/api/sales-calls/calls/{id}/handoff` | Prefill para la Power App de una llamada calificada |
+    | `POST` | `/api/sales-calls/batches` | Crear campaña (batch calling) con política de pacing |
+    | `GET` | `/api/sales-calls/batches` | Listar campañas |
+    | `GET` | `/api/sales-calls/batches/{id}` | Progreso agregado de una campaña (polling) |
+    | `GET` | `/api/sales-calls/batches/{id}/items` | Items (llamadas) de una campaña |
+    | `POST` | `/api/sales-calls/batches/{id}/{action}` | Pausar / reanudar / cancelar una campaña |
+    | `POST` | `/api/sales-calls/cron/dispatch` | Dispatcher progressive (Vercel Cron) |
     | `POST` | `/api/sales-calls/webhooks/fonema/call-update` | Webhook Fonema: cambio de estado |
     | `POST` | `/api/sales-calls/webhooks/fonema/end-of-call` | Webhook Fonema: fin de llamada |
     | `POST` | `/api/sales-calls/webhooks/fonema/end-of-session` | Webhook Fonema: fin de sesión |
@@ -39,6 +46,17 @@ info:
     `identidad_verificada`, `cliente_interesado`) llega de forma asíncrona por los webhooks
     de Fonema. La grabación se sirve vía proxy autenticado para no exponer la API key al
     cliente. Los ejemplos usan datos sintéticos; nunca datos reales de clientes.
+
+    ## Sales Calls — batch calling (campañas)
+
+    Sobre la llamada individual se construye la capa de campaña: se sube una lista de leads
+    + una política de **pacing** y el backend la encola en Supabase. Un dispatcher
+    **progressive** (invocado por Vercel Cron) drena la cola respetando dos perillas
+    independientes — concurrencia (`maxConcurrent`) y throughput (`perHour`) — y una ventana
+    de contacto. El cliente no dispara N llamadas: consulta el progreso agregado por polling
+    en `GET /batches/{id}`. Es idempotente por `leadId` (no re-marca) y controlable
+    (pausar / reanudar / cancelar). Cuando un item cierra CALIFICADO, su llamada queda
+    disponible para handoff a la Power App vía `GET /calls/{id}/handoff`.
 
   contact:
     name: Banca Empresas — Hackathon
@@ -459,6 +477,202 @@ paths:
       responses:
         '204':
           description: Evento reconocido (sin contenido)
+
+  /api/sales-calls/batches:
+    post:
+      tags: [Sales Calls]
+      summary: Crear campaña (batch calling)
+      description: |
+        Crea una campaña de llamadas: sube la lista de leads + una política de pacing y
+        el backend la encola. Un dispatcher **progressive** (Vercel Cron) la drena
+        respetando concurrencia (`maxConcurrent`), throughput (`perHour`) y ventana de
+        contacto. El cliente NO dispara N llamadas: consulta el progreso agregado por
+        polling en `GET /batches/{id}`. Idempotente por `leadId` dentro del batch.
+        Los campos de `pacing` omitidos toman los defaults del servidor.
+      operationId: createCallBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCallBatchRequest'
+            example:
+              name: Campaña TC LATAM Business — Julio
+              leads:
+                - leadId: lead-demo-001
+                  phoneNumber: '+573001112233'
+                  customerName: María Restrepo
+                  variables:
+                    razonSocial: CORRUGADOS DEL DARIEN S.A.S
+                    nit: '8000194370'
+                - leadId: lead-demo-002
+                  phoneNumber: '+573004445566'
+              pacing:
+                maxConcurrent: 20
+                perHour: 60
+                businessHours: { startHour: 8, endHour: 20 }
+                timezone: America/Bogota
+      responses:
+        '201':
+          description: Campaña creada y encolada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallBatch'
+        '400':
+          description: Payload inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags: [Sales Calls]
+      summary: Listar campañas
+      operationId: listCallBatches
+      responses:
+        '200':
+          description: Lista de campañas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CallBatch'
+
+  /api/sales-calls/batches/{id}:
+    get:
+      tags: [Sales Calls]
+      summary: Progreso agregado de una campaña (polling)
+      operationId: getCallBatch
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+      responses:
+        '200':
+          description: Progreso de la campaña
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallBatchProgress'
+        '404':
+          description: Campaña no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/sales-calls/batches/{id}/items:
+    get:
+      tags: [Sales Calls]
+      summary: Items (llamadas) de una campaña
+      operationId: listCallBatchItems
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+      responses:
+        '200':
+          description: Items de la campaña con su estado por llamada
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CallBatchItem'
+        '404':
+          description: Campaña no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/sales-calls/batches/{id}/{action}:
+    post:
+      tags: [Sales Calls]
+      summary: Controlar el ciclo de vida de una campaña
+      description: Pausa, reanuda o cancela la campaña. Una campaña pausada no es drenada por el dispatcher.
+      operationId: setCallBatchStatus
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [pause, resume, cancel]
+      responses:
+        '200':
+          description: Campaña actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallBatch'
+        '400':
+          description: Transición inválida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Campaña no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/sales-calls/calls/{id}/handoff:
+    get:
+      tags: [Sales Calls]
+      summary: Prefill para la Power App (handoff de una llamada calificada)
+      description: |
+        Cuando una llamada cierra CALIFICADA (identidad verificada + cliente interesado),
+        devuelve el prefill de la solicitud con la forma de `POST /api/power-apps/submit`.
+        El front lo usa para pre-diligenciar el formulario. Responde 404 si la llamada no
+        existe o no está calificada.
+      operationId: getCallHandoff
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Prefill de la Power App
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PowerAppPrefill'
+        '404':
+          description: Llamada inexistente o no calificada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/sales-calls/cron/dispatch:
+    post:
+      tags: [Sales Calls]
+      summary: Dispatcher progressive (invocado por Vercel Cron)
+      description: |
+        Drena las campañas `running`: por cada una calcula el headroom
+        `min(maxConcurrent − activos, perHour − arrancadas_última_hora, en_cola)`,
+        hace claim atómico de esa cantidad de items en cola y dispara sus llamadas.
+        Protegido con `Authorization: Bearer $CRON_SECRET`. Existe variante `GET` para pruebas.
+      operationId: dispatchCallBatches
+      security:
+        - cronSecret: []
+      responses:
+        '200':
+          description: Resultado del tick de dispatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispatchResult'
+        '401':
+          description: Secret de cron inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   schemas:
@@ -971,3 +1185,294 @@ components:
             message:
               type: string
               example: An unexpected error occurred
+
+    PacingPolicy:
+      type: object
+      description: |
+        Política de ritmo. Dos perillas independientes (concurrencia y throughput) +
+        ventana de contacto. La ventana y el ritmo son control de cumplimiento
+        (habeas data / horarios de contacto), no solo UX.
+      required: [maxConcurrent, perHour, timezone]
+      properties:
+        maxConcurrent:
+          type: integer
+          minimum: 1
+          maximum: 500
+          description: Slots simultáneos. Techo real = concurrencia de la cuenta Fonema (~500).
+          example: 20
+        perHour:
+          type: integer
+          minimum: 1
+          description: Máximo de llamadas arrancadas por hora (throughput).
+          example: 60
+        earliestAt:
+          type: string
+          format: date-time
+          description: No marcar antes de este instante (opcional).
+        latestAt:
+          type: string
+          format: date-time
+          description: No marcar después de este instante (opcional).
+        businessHours:
+          type: object
+          nullable: true
+          properties:
+            startHour:
+              type: integer
+              minimum: 0
+              maximum: 23
+              example: 8
+            endHour:
+              type: integer
+              minimum: 1
+              maximum: 24
+              example: 20
+        timezone:
+          type: string
+          example: America/Bogota
+
+    BatchLead:
+      type: object
+      required: [leadId, phoneNumber]
+      properties:
+        leadId:
+          type: string
+          description: Identificador del lead. Idempotencia por (batch, leadId).
+          example: lead-demo-001
+        phoneNumber:
+          type: string
+          description: Teléfono en formato E.164.
+          example: '+573001112233'
+        customerName:
+          type: string
+          example: María Restrepo
+        customerEmail:
+          type: string
+          format: email
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+          description: Variables inyectadas al agente Fonema para esta llamada.
+
+    CreateCallBatchRequest:
+      type: object
+      required: [name, leads]
+      properties:
+        name:
+          type: string
+          example: Campaña TC LATAM Business — Julio
+        agentId:
+          type: string
+          description: Agente Fonema. Si se omite, usa FONEMA_SALES_AGENT_ID.
+        leads:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items:
+            $ref: '#/components/schemas/BatchLead'
+        pacing:
+          $ref: '#/components/schemas/PacingPolicy'
+        defaultVariables:
+          type: object
+          additionalProperties:
+            type: string
+          description: Variables aplicadas a todas las llamadas (mezcladas con las del lead).
+
+    CallBatch:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        agentId:
+          type: string
+        status:
+          type: string
+          enum: [running, paused, completed, cancelled]
+        pacing:
+          $ref: '#/components/schemas/PacingPolicy'
+        defaultVariables:
+          type: object
+          additionalProperties:
+            type: string
+        total:
+          type: integer
+          example: 2
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CallBatchItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+          format: uuid
+        leadId:
+          type: string
+        phoneNumber:
+          type: string
+        customerName:
+          type: string
+        customerEmail:
+          type: string
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+        status:
+          type: string
+          enum: [queued, dialing, in_progress, completed, failed, skipped]
+        callId:
+          type: string
+          format: uuid
+          nullable: true
+        sessionId:
+          type: string
+          nullable: true
+        qualified:
+          type: boolean
+          nullable: true
+          description: true si la llamada cerró calificada (apta para handoff a power-apps).
+        attempts:
+          type: integer
+        lastError:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    BatchCounts:
+      type: object
+      properties:
+        queued:
+          type: integer
+        dialing:
+          type: integer
+        in_progress:
+          type: integer
+        completed:
+          type: integer
+        failed:
+          type: integer
+        skipped:
+          type: integer
+        total:
+          type: integer
+
+    CallBatchProgress:
+      type: object
+      properties:
+        batch:
+          $ref: '#/components/schemas/CallBatch'
+        counts:
+          $ref: '#/components/schemas/BatchCounts'
+        progress:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: (completed + failed + skipped) / total
+          example: 0.5
+
+    DispatchResult:
+      type: object
+      properties:
+        batchesConsidered:
+          type: integer
+          example: 1
+        dialed:
+          type: integer
+          description: Llamadas efectivamente disparadas en este tick.
+          example: 20
+        completedBatches:
+          type: integer
+          example: 0
+
+    PowerAppPrefill:
+      type: object
+      description: |
+        Handoff de una llamada calificada hacia la Power App. Subconjunto parcial de
+        `PowerAppSubmitRequest` con lo conocido desde la llamada; el asesor completa el
+        resto (Cámara de Comercio, agendamiento de entrega).
+      required: [origenLlamada]
+      properties:
+        leadId:
+          type: string
+          example: lead-demo-001
+        campana:
+          type: string
+        empresa:
+          type: object
+          properties:
+            nit: { type: string, example: '8000194370' }
+            razonSocial: { type: string, example: CORRUGADOS DEL DARIEN S.A.S }
+            segmento: { type: string }
+            ciudad: { type: string }
+            direccion: { type: string }
+        tarjetahabiente:
+          type: object
+          properties:
+            tipoDocumento: { type: string, enum: [CC, CE, PA, TI] }
+            numeroDocumento: { type: string }
+            nombres: { type: string, example: María }
+            apellidos: { type: string, example: Restrepo }
+            cargo: { type: string }
+            email: { type: string }
+            telefono: { type: string, example: '+573001112233' }
+        cupo:
+          type: object
+          properties:
+            solicitado: { type: number }
+            disponibleCec: { type: number }
+        producto:
+          type: object
+          properties:
+            codigo: { type: string, example: TC_LATAM_BUSINESS }
+            franquicia: { type: string, example: VISA }
+        origenLlamada:
+          type: object
+          required: [callId]
+          properties:
+            callId: { type: string, format: uuid }
+            sessionId: { type: string }
+            resumen: { type: string }
+            grabacionUrl: { type: string }
+            finalizadaEn: { type: string, format: date-time }
+
+  parameters:
+    BatchId:
+      name: id
+      in: path
+      required: true
+      description: Identificador de la campaña
+      schema:
+        type: string
+        format: uuid
+
+  securitySchemes:
+    cronSecret:
+      type: http
+      scheme: bearer
+      description: Bearer $CRON_SECRET inyectado por Vercel Cron.

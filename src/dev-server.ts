@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import { createApp } from './app.js';
+import { createApp } from './create-app.js';
 import { env } from './infrastructure/config/env.js';
 import { startDeliveryConfirmationScheduler } from './features/delivery-confirmation/infrastructure/scheduler.js';
 

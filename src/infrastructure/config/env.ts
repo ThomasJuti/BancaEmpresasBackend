@@ -17,6 +17,14 @@ const envSchema = z.object({
   CONFIRMATION_TOKEN_SECRET: z.string().optional().default(''),
   FRONTEND_CONFIRMATION_URL: z.string().url().optional().or(z.literal('')).default(''),
   CRON_SECRET: z.string().optional().default(''),
+  // Pacing por defecto de las campañas de llamadas (dos perillas + ventana).
+  // El techo real de concurrencia es el de la cuenta Fonema (~500); el pacing de
+  // negocio nunca debe excederlo.
+  CALL_BATCH_MAX_CONCURRENT: z.coerce.number().int().positive().default(20),
+  CALL_BATCH_PER_HOUR: z.coerce.number().int().positive().default(60),
+  CALL_BATCH_BUSINESS_START_HOUR: z.coerce.number().int().min(0).max(23).default(8),
+  CALL_BATCH_BUSINESS_END_HOUR: z.coerce.number().int().min(1).max(24).default(20),
+  CALL_BATCH_TIMEZONE: z.string().default('America/Bogota'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -57,5 +65,14 @@ export const env = {
   },
   cron: {
     secret: data.CRON_SECRET,
+  },
+  callBatch: {
+    maxConcurrent: data.CALL_BATCH_MAX_CONCURRENT,
+    perHour: data.CALL_BATCH_PER_HOUR,
+    businessHours: {
+      startHour: data.CALL_BATCH_BUSINESS_START_HOUR,
+      endHour: data.CALL_BATCH_BUSINESS_END_HOUR,
+    },
+    timezone: data.CALL_BATCH_TIMEZONE,
   },
 } as const;

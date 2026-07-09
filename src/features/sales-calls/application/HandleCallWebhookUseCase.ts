@@ -1,5 +1,7 @@
-import type { CallStatus, TranscriptMessage } from '../domain/Call.js';
+import type { Call, CallStatus, TranscriptMessage } from '../domain/Call.js';
 import type { CallRepository } from '../domain/CallRepository.js';
+import type { CallBatchRepository } from '../domain/CallBatchRepository.js';
+import { isCallQualified } from '../domain/qualification.js';
 
 // Esquemas según docs.fonema.ai/api/webhook/*
 
@@ -41,7 +43,12 @@ export interface EndOfSessionPayload {
 }
 
 export class HandleCallWebhookUseCase {
-  constructor(private readonly callRepository: CallRepository) {}
+  constructor(
+    private readonly callRepository: CallRepository,
+    // Opcional: si el call pertenece a una campaña, se sincroniza su item.
+    // Ausente en configuraciones sin batch (p. ej. seed/demo in-memory).
+    private readonly batchRepository?: CallBatchRepository,
+  ) {}
 
   // Webhook "actualizaciones-de-llamada": cambios de estado en tiempo real.
   async handleCallUpdate(payload: CallUpdatePayload): Promise<void> {
@@ -60,6 +67,14 @@ export class HandleCallWebhookUseCase {
     call.status = this.mapStatus(payload.status);
     call.updatedAt = new Date().toISOString();
     await this.callRepository.save(call);
+
+    // Refleja "en progreso" en el item de campaña (ambos estados cuentan como activos).
+    if (call.status === 'in_progress' && this.batchRepository && call.sessionId) {
+      const item = await this.batchRepository.findItemBySessionId(call.sessionId);
+      if (item && item.status === 'dialing') {
+        await this.batchRepository.markItem(item.id, 'in_progress', { callId: call.id });
+      }
+    }
   }
 
   // Webhook "fin-de-llamada": trae grabación, transcript y análisis.
@@ -87,6 +102,7 @@ export class HandleCallWebhookUseCase {
     call.updatedAt = new Date().toISOString();
 
     await this.callRepository.save(call);
+    await this.syncBatchItem(call, 'completed');
   }
 
   // Webhook "fin-de-sesion": se agotaron los reintentos hacia el cliente.
@@ -97,6 +113,27 @@ export class HandleCallWebhookUseCase {
   // repositorio por número (pendiente si se necesita este dato).
   async handleEndOfSession(_payload: EndOfSessionPayload): Promise<void> {
     return;
+  }
+
+  /**
+   * Si la llamada pertenece a una campaña, sincroniza su item: estado terminal,
+   * bandera `qualified` (para el handoff a power-apps) y fin. Correlaciona por
+   * sessionId (fijado al despachar) y, en su defecto, por callId.
+   */
+  private async syncBatchItem(call: Call, terminal: 'completed' | 'failed'): Promise<void> {
+    if (!this.batchRepository) return;
+
+    const item = call.sessionId
+      ? await this.batchRepository.findItemBySessionId(call.sessionId)
+      : await this.batchRepository.findItemByCallId(call.id);
+    if (!item) return;
+
+    const status = call.status === 'failed' ? 'failed' : terminal;
+    await this.batchRepository.markItem(item.id, status, {
+      callId: call.id,
+      qualified: isCallQualified(call),
+      endedAt: new Date().toISOString(),
+    });
   }
 
   private mapStatus(status?: string): CallStatus {
