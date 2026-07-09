@@ -120,8 +120,10 @@ Genera dos listas y las persiste (regenerándolas por completo en cada corrida):
 
 | Lista | Tabla | Condiciones |
 |---|---|---|
-| Validación completa | `clientes_finales` | gestionable + sin TC (base potencial) + cupo disponible (CEC) + pagaré activo |
-| Validación sin pagaré | `clientes_finales_sin_pagare` | gestionable + sin TC (base potencial) + cupo disponible (CEC) |
+| Validación completa | `clientes_finales` | gestionable + sin TC + segmento Pequeña/Mediana/Empresarial (base potencial) + cupo disponible (CEC) + pagaré activo |
+| Validación sin pagaré | `clientes_finales_sin_pagare` | gestionable + sin TC + segmento Pequeña/Mediana/Empresarial (base potencial) + cupo disponible (CEC) |
+
+> El segmento se lee de la columna `Direccion` de la base potencial (que contiene el segmento del cliente, no una dirección postal).
 
 La respuesta trae solo conteos (sin datos de clientes). Para consultar las listas:
 

@@ -5,7 +5,10 @@ export interface CecRepository {
   findConCupoDisponible(): Promise<CecCliente[]>;
 }
 
-/** Clientes de base potencial gestionables y sin tarjeta de crédito. */
+/**
+ * Clientes de base potencial gestionables, sin tarjeta de crédito y en un
+ * segmento objetivo (Pequeña / Mediana / Empresarial).
+ */
 export interface BasePotencialRepository {
   findGestionablesSinTarjeta(clienteIds: string[]): Promise<BasePotencialCliente[]>;
 }

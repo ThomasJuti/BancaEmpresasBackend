@@ -1,3 +1,4 @@
+import { AppError } from '../../../shared/exceptions/app-error.js';
 import type { ClienteFinal, FileMatchingResumen } from '../domain/entities.js';
 import type {
   BasePotencialRepository,
@@ -17,6 +18,14 @@ import type {
  * El cruce parte de CEC (la tabla pequeña) para no leer la base potencial completa.
  */
 export class BuildClientesFinalesUseCase {
+  /**
+   * El cruce es repetible: el front lo dispara con un botón cuando quiera y cada
+   * corrida regenera ambas tablas por completo. Este flag impide corridas
+   * solapadas (doble clic / usuarios concurrentes), que dejarían las tablas
+   * derivadas inconsistentes porque replaceAll borra y luego inserta.
+   */
+  private isRunning = false;
+
   constructor(
     private readonly cecRepository: CecRepository,
     private readonly basePotencialRepository: BasePotencialRepository,
@@ -26,19 +35,32 @@ export class BuildClientesFinalesUseCase {
   ) {}
 
   async execute(): Promise<FileMatchingResumen> {
-    const { candidatos, cecConCupo } = await this.buildCandidatosSinPagare();
-    await this.clientesFinalesSinPagareRepository.replaceAll(candidatos);
+    if (this.isRunning) {
+      throw new AppError(
+        'Ya hay una generación de clientes finales en curso.',
+        409,
+        'RUN_IN_PROGRESS',
+      );
+    }
+    this.isRunning = true;
+    try {
+      const { candidatos, cecConCupo } = await this.buildCandidatosSinPagare();
+      await this.clientesFinalesSinPagareRepository.replaceAll(candidatos);
 
-    const { clientesFinales, conPagareActivo } = await this.aplicarCondicionPagare(candidatos);
-    await this.clientesFinalesRepository.replaceAll(clientesFinales);
+      const { clientesFinales, conPagareActivo } = await this.aplicarCondicionPagare(candidatos);
+      await this.clientesFinalesRepository.replaceAll(clientesFinales);
 
-    return {
-      cecConCupo,
-      gestionablesSinTc: candidatos.length,
-      conPagareActivo,
-      clientesFinales: clientesFinales.length,
-      clientesFinalesSinPagare: candidatos.length,
-    };
+      return {
+        cecConCupo,
+        gestionablesSinTc: candidatos.length,
+        conPagareActivo,
+        clientesFinales: clientesFinales.length,
+        clientesFinalesSinPagare: candidatos.length,
+        generadoEn: new Date().toISOString(),
+      };
+    } finally {
+      this.isRunning = false;
+    }
   }
 
   /** Pasos comunes a ambas validaciones: cupo CEC ∩ gestionable sin TC. */

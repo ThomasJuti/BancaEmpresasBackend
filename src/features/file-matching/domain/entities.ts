@@ -31,4 +31,6 @@ export interface FileMatchingResumen {
   conPagareActivo: number;
   clientesFinales: number;
   clientesFinalesSinPagare: number;
+  /** Momento en que se ejecutó el cruce (ISO 8601), para mostrar "última generación" en el front. */
+  generadoEn: string;
 }
