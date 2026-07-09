@@ -84,10 +84,8 @@ create table if not exists delivery_confirmation_emails (
 create index if not exists idx_delivery_emails_case on delivery_confirmation_emails (delivery_case_id);
 create index if not exists idx_delivery_emails_token on delivery_confirmation_emails (token_hash);
 
--- Seed de demo (solo para ambientes no productivos; datos ficticios)
-insert into company_managers (company_id, name, email)
-values
-  ('empresa-demo-001', 'Gerente Demo Uno', 'gerente1@example.com'),
-  ('empresa-demo-001', 'Gerente Demo Dos', 'gerente2@example.com'),
-  ('empresa-demo-002', 'Gerente Demo Tres', 'gerente3@example.com')
-on conflict (company_id, email) do nothing;
+-- RLS: solo backend (service role)
+alter table pipeline_cases enable row level security;
+alter table company_managers enable row level security;
+alter table delivery_confirmation_cases enable row level security;
+alter table delivery_confirmation_emails enable row level security;

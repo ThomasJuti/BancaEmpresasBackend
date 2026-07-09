@@ -191,8 +191,8 @@ paths:
                 valid: true
                 radicado: GOPTC-2026-B678F1A5
                 issues: []
-                summary: Solicitud aprobada. Operaciones puede iniciar realce y entrega de la tarjeta.
-                siguientePaso: Operaciones procesará realce, fabricación y envío. El gerente comercial hará entrega del plástico.
+                summary: Solicitud aprobada. Operaciones puede iniciar realce y armado de carpeta.
+                siguientePaso: Operaciones procesará realce, fabricación y armado de carpeta. Operaciones entregará la carpeta al gerente de relaciones, quien hará entrega de las tarjetas al gerente de la empresa solicitante.
                 submittedAt: '2026-07-09T17:00:03.141Z'
         '400':
           description: Payload inválido — campos obligatorios o formato incorrecto
@@ -587,12 +587,17 @@ components:
 
     Entrega:
       type: object
+      description: |
+        Logística acordada al radicar la solicitud. No modela el tracking posterior
+        (operaciones → gerente de relaciones → gerente de empresa).
       required: [tipo, ciudad, direccion, fechaAgendamiento]
       properties:
         tipo:
           type: string
           enum: [courier, comercial]
-          description: courier = envío certificado; comercial = entrega por gerente asignado
+          description: |
+            `comercial` — entrega coordinada por gerente de relaciones.
+            `courier` — envío certificado a la dirección indicada.
         ciudad:
           type: string
           example: Bogotá

@@ -3,8 +3,10 @@ import { z } from 'zod';
 import { registerShipment } from '../application/register-shipment.js';
 import { confirmDelivery } from '../application/confirm-delivery.js';
 import { getCaseStatus, getConfirmationView } from '../application/get-case-status.js';
+import { processDueEmails } from '../application/process-due-emails.js';
 import { getDeliveryConfirmationDeps } from '../infrastructure/composition.js';
 import { ValidationError } from '../../../shared/exceptions/app-error.js';
+import { verifyCronSecret } from '../../../shared/middlewares/verify-cron-secret.js';
 
 /**
  * Confirmación de entrega física de tarjeta al gerente de la empresa.
@@ -71,6 +73,16 @@ deliveryConfirmationRouter.post('/confirm', async (req, res) => {
   const deps = getDeliveryConfirmationDeps();
   const result = await confirmDelivery(parsed.data, deps);
   res.json(result);
+});
+
+/**
+ * Procesa correos vencidos. En Vercel lo invoca el cron cada 5 min;
+ * en local el scheduler hace lo mismo cada 5 s.
+ */
+deliveryConfirmationRouter.get('/cron/process-due', verifyCronSecret, async (_req, res) => {
+  const deps = getDeliveryConfirmationDeps();
+  const processed = await processDueEmails(deps);
+  res.json({ processed });
 });
 
 /** Estado del caso por caseId del pipeline (UI/ops). */

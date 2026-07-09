@@ -88,11 +88,14 @@ Dado que el sistema maneja datos de clientes y operaciones financieras de empres
 file-matching (viabilidad: Base × CEC × SG)
   → sales-calls (Fonema.ia — llamada de venta)
   → power-apps (solicitud + validaciones + Cámara de Comercio)
-  → operaciones (realce GOPTC, fabricación, envío)
-  → entrega por gerente comercial
+  → operaciones (realce GOPTC, fabricación, armado de carpeta)
+  → gerente de relaciones (recibe carpeta de operaciones)
+  → gerente de la empresa solicitante (recibe tarjetas del gerente de relaciones)
   → activation-email (Resend)
   → activation-follow-up (Fonema.ia — seguimiento ~3 meses por activación)
 ```
+
+**Cadena de entrega física:** operaciones no entrega directamente al cliente. Arma la carpeta con las tarjetas y se la entrega al **gerente de relaciones** del banco; este, a su vez, hace la entrega al **gerente de la empresa solicitante**, quien distribuye los plásticos dentro de la organización.
 
 ### Sales Calls (Fonema.ia — llamada de venta)
 
@@ -125,9 +128,20 @@ Tras cerrar la venta telefónica, se diligencia la solicitud con los datos de em
 - Campos obligatorios y formatos (NIT, documento PN, email, teléfono, fechas)
 - Coherencia entre identificaciones de empresa y tarjetahabiente
 - Cupo solicitado vs disponible CEC
-- Agendamiento (días hábiles, no fechas pasadas)
+- Agendamiento de entrega (días hábiles, no fechas pasadas)
 - Cámara de Comercio (presencia y coincidencia de NIT)
 - Producto y segmento de campaña
+
+**Bloque `entrega` (logística al radicar):**
+
+| Campo | Significado |
+|-------|-------------|
+| `tipo: comercial` | Entrega coordinada por gerente de relaciones |
+| `tipo: courier` | Envío certificado a la dirección indicada |
+| `ciudad` / `direccion` | Punto de entrega o envío |
+| `fechaAgendamiento` | Día hábil tentativo (lunes–viernes) |
+
+Este bloque no modela la cadena operativa posterior (carpeta → gerente de relaciones → gerente de empresa); solo registra lo acordado en la solicitud.
 
 ### Agendamiento y ANS (referencia operativa)
 

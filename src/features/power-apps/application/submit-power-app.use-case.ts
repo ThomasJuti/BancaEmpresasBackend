@@ -54,12 +54,12 @@ function resolveDecision(issues: ValidationIssue[]): PowerAppDecision {
 function buildSummary(decision: PowerAppDecision, errorCount: number, warningCount: number): string {
   if (decision === 'APROBADO') {
     return warningCount > 0
-      ? `Solicitud aprobada con ${warningCount} advertencia(s). Operaciones puede iniciar realce y entrega.`
-      : 'Solicitud aprobada. Operaciones puede iniciar realce y entrega de la tarjeta.';
+      ? `Solicitud aprobada con ${warningCount} advertencia(s). Operaciones puede iniciar realce y armado de carpeta.`
+      : 'Solicitud aprobada. Operaciones puede iniciar realce y armado de carpeta.';
   }
 
   if (decision === 'DEVUELTO') {
-    return `Solicitud devuelta: se detectaron ${errorCount} error(es) corregibles (posible intercambio de datos).`;
+    return `Solicitud devuelta: se detectaron ${errorCount} error(es) corregibles en los campos reportados.`;
   }
 
   return `Solicitud rechazada: se encontraron ${errorCount} error(es) que impiden continuar.`;
@@ -81,7 +81,7 @@ export function submitPowerAppUseCase(dto: SubmitPowerAppDto): SubmitPowerAppRes
     issues,
     summary: buildSummary(decision, errorCount, warningCount),
     siguientePaso: approved
-      ? 'Operaciones procesará realce, fabricación y envío. El gerente comercial hará entrega del plástico.'
+      ? 'Operaciones procesará realce, fabricación y armado de carpeta. Operaciones entregará la carpeta al gerente de relaciones, quien hará entrega de las tarjetas al gerente de la empresa solicitante.'
       : decision === 'DEVUELTO'
         ? 'Corrija los campos señalados y vuelva a enviar la solicitud.'
         : 'Revise los errores reportados antes de reintentar.',

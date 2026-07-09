@@ -1,15 +1,8 @@
--- Esquema del paso 1 del pipeline (file-matching).
--- Ejecutar una vez en el SQL Editor de Supabase.
---
--- Tablas fuente (en producción se poblarán desde una fuente externa;
--- por ahora se precargan con `npm run seed` desde los Excel en docs/):
---   base_potencial              <- "Copia de Base Potencial _ VP Banca Empresas.xlsx" (hoja DATA)
---   cec                         <- "CEC.xlsx" (hoja "activos cec")
---   clientes_potenciales_grabar <- "Clientes potenciales para grabar SG.xlsx" (hoja Base)
---
--- Tablas resultado (regeneradas en cada corrida de POST /api/file-matching/run):
---   clientes_finales            <- validación completa (4 condiciones)
---   clientes_finales_sin_pagare <- validación sin la condición de pagaré activo
+-- Esquema completo de Banca Empresas Backend.
+-- Opción A (recomendada): supabase db push  (aplica supabase/migrations/*)
+-- Opción B: pegar este archivo en el SQL Editor de Supabase (una sola vez).
+
+-- ── file-matching ────────────────────────────────────────────────────────────
 
 create table if not exists base_potencial (
   id bigint generated always as identity primary key,
@@ -94,10 +87,94 @@ create table if not exists clientes_finales_sin_pagare (
   creado_en timestamptz not null default now()
 );
 
--- RLS habilitado sin políticas: solo el backend (service role) accede a estos datos;
--- la anon key no puede leer información de clientes.
 alter table base_potencial enable row level security;
 alter table cec enable row level security;
 alter table clientes_potenciales_grabar enable row level security;
 alter table clientes_finales enable row level security;
 alter table clientes_finales_sin_pagare enable row level security;
+
+-- ── delivery-confirmation + pipeline ─────────────────────────────────────────
+
+create table if not exists pipeline_cases (
+  id uuid primary key default gen_random_uuid(),
+  lead_id text not null,
+  stage text not null default 'file_matching'
+    check (stage in (
+      'file_matching',
+      'sales_call',
+      'power_apps',
+      'delivery_confirmation',
+      'activation_follow_up',
+      'completed',
+      'rejected',
+      'failed'
+    )),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists company_managers (
+  id uuid primary key default gen_random_uuid(),
+  company_id text not null,
+  name text not null,
+  email text not null,
+  created_at timestamptz not null default now(),
+  unique (company_id, email)
+);
+
+create index if not exists idx_company_managers_company on company_managers (company_id);
+
+create table if not exists delivery_confirmation_cases (
+  id uuid primary key default gen_random_uuid(),
+  case_id uuid not null references pipeline_cases (id),
+  card_id text not null unique,
+  company_id text not null,
+  card_holder_name text not null,
+  card_last_four text not null check (char_length(card_last_four) = 4),
+  status text not null default 'scheduled'
+    check (status in (
+      'scheduled',
+      'sent',
+      'awaiting_confirmation',
+      'confirmed',
+      'retry_scheduled',
+      'failed'
+    )),
+  outcome text
+    check (outcome is null or outcome in (
+      'delivered_to_holder',
+      'not_arrived',
+      'holder_absent',
+      'return_to_bank'
+    )),
+  physical_shipped_at timestamptz not null,
+  email_scheduled_at timestamptz not null,
+  sent_at timestamptz,
+  confirmed_at timestamptz,
+  attempt_count integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_delivery_cases_due
+  on delivery_confirmation_cases (email_scheduled_at)
+  where status in ('scheduled', 'retry_scheduled');
+
+create table if not exists delivery_confirmation_emails (
+  id uuid primary key default gen_random_uuid(),
+  delivery_case_id uuid not null references delivery_confirmation_cases (id),
+  manager_email text not null,
+  provider_message_id text,
+  token_hash text not null,
+  status text not null default 'sent'
+    check (status in ('sent', 'used', 'failed')),
+  sent_at timestamptz not null default now()
+);
+
+create index if not exists idx_delivery_emails_case on delivery_confirmation_emails (delivery_case_id);
+create index if not exists idx_delivery_emails_token on delivery_confirmation_emails (token_hash);
+
+alter table pipeline_cases enable row level security;
+alter table company_managers enable row level security;
+alter table delivery_confirmation_cases enable row level security;
+alter table delivery_confirmation_emails enable row level security;

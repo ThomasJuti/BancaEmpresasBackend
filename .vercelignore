@@ -1,0 +1,3 @@
+docs/*.xlsx
+.env
+.env.local

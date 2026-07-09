@@ -3,6 +3,7 @@ dist/
 .env
 .env.local
 .env.*.local
+.vercel/
 *.log
 .DS_Store
 coverage/
@@ -11,3 +12,6 @@ coverage/
 
 # Datos reales de clientes para el seed local — no versionar
 docs/*.xlsx
+
+# Herramientas de agentes locales
+.atl/

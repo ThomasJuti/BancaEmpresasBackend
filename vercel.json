@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "",
+  "functions": {
+    "src/server.ts": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/delivery-confirmation/cron/process-due",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

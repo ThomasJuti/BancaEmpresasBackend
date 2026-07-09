@@ -16,6 +16,7 @@ const envSchema = z.object({
   TIME_COMPRESSION_DAY_MS: z.coerce.number().int().positive().default(60_000),
   CONFIRMATION_TOKEN_SECRET: z.string().optional().default(''),
   FRONTEND_CONFIRMATION_URL: z.string().url().optional().or(z.literal('')).default(''),
+  CRON_SECRET: z.string().optional().default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -53,5 +54,8 @@ export const env = {
     dayMs: data.TIME_COMPRESSION_DAY_MS,
     tokenSecret: data.CONFIRMATION_TOKEN_SECRET,
     frontendConfirmationUrl: data.FRONTEND_CONFIRMATION_URL || '',
+  },
+  cron: {
+    secret: data.CRON_SECRET,
   },
 } as const;
