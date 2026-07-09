@@ -22,11 +22,12 @@ export type DeliveryEmailStatus =
 
 export interface DeliveryConfirmationCase {
   id: string;
+  /** Caso del pipeline al que pertenece esta tarjeta. */
   caseId: string;
   cardId: string;
   companyId: string;
-  /** Emails de gerentes (pueden ser varios; salen de Supabase). */
-  managerEmails: string[];
+  cardHolderName: string;
+  cardLastFour: string;
   status: DeliveryEmailStatus;
   outcome?: DeliveryConfirmationOutcome;
   /** Fecha/hora emulada o real del envío físico de la tarjeta. */
@@ -35,4 +36,28 @@ export interface DeliveryConfirmationCase {
   emailScheduledAt: string;
   sentAt?: string;
   confirmedAt?: string;
+  attemptCount: number;
+}
+
+export interface NewDeliveryConfirmationCase {
+  caseId: string;
+  cardId: string;
+  companyId: string;
+  cardHolderName: string;
+  cardLastFour: string;
+  physicalShippedAt: string;
+  emailScheduledAt: string;
+}
+
+/** Registro de auditoría de un correo enviado a un gerente. */
+export interface DeliveryEmailAttempt {
+  deliveryCaseId: string;
+  managerEmail: string;
+  providerMessageId?: string;
+  tokenHash: string;
+}
+
+export interface CompanyManager {
+  name: string;
+  email: string;
 }

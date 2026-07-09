@@ -35,3 +35,11 @@ export interface PipelineCase {
   updatedAt: string;
   metadata?: Record<string, unknown>;
 }
+
+/**
+ * Contrato para que las features avancen el pipeline sin importar
+ * internals de core/pipeline.
+ */
+export interface PipelineStageAdvancer {
+  advance(caseId: string, toStage: PipelineStage): Promise<void>;
+}

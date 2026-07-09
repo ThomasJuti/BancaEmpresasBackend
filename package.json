@@ -9,7 +9,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "seed": "tsx scripts/seed-from-excel.ts"
+    "seed": "tsx scripts/seed-from-excel.ts",
+    "demo:delivery": "tsx scripts/e2e-demo.ts"
   },
   "engines": {
     "node": ">=20"
