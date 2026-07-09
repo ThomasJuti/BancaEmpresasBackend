@@ -1,41 +1,22 @@
 # Banca Empresas Backend
 
-Pipeline de venta de tarjetas de crédito con human-in-the-loop.
+Backend del pipeline de venta de **Tarjeta de Crédito LATAM Business** (Banca Empresas — Banco de Bogotá).
 
 ## Stack
 
 - TypeScript + Express
 - Supabase (Postgres)
-- Fonema.ia (llamadas agenticas de venta y seguimiento)
-- Resend (correos de confirmación de entrega)
+- Fonema.ia · Resend
 
-## Flujo
-
-```
-file-matching (base potencial × CEC)
-  → sales-calls (Fonema.ia)
-  → power-apps (HITL)
-  → delivery-confirmation (Resend → gerente confirma entrega física)
-  → activation-follow-up (Fonema.ia — beneficio / inducción a activación)
-```
-
-### delivery-confirmation
-
-1. Se emula ~3–4 días desde el envío físico de la tarjeta.
-2. Se envía un correo **por tarjeta** a el/los gerentes (emails en Supabase).
-3. El gerente abre una página del frontend y elige:
-   - entregó al titular → avanza pipeline a `activation-follow-up`
-   - no llegó / titular ausente / devolver al banco → reintento de correo a +1 día
-
-## Setup
+## Inicio rápido
 
 ```bash
-cp .env.example .env   # completar SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY
+cp .env.example .env
 npm install
 npm run dev
 ```
 
-Health: `GET /health`
+Servicio en `http://localhost:3000`.
 
 ## Despliegue
 
@@ -60,10 +41,8 @@ Health en producción: `GET https://<tu-app>.vercel.app/health`
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `GET` | `/health` | Health check del servicio |
-| `POST` | `/api/power-apps/submit` | Simulador de Power App con comprobación de campos |
-
-Otras etapas del pipeline se irán exponiendo conforme se implementen.
+| `GET` | `/health` | Health check |
+| `POST` | `/api/power-apps/submit` | Simulador Power App — comprobación de campos |
 
 ## Documentación API (OpenAPI)
 
@@ -72,11 +51,35 @@ Otras etapas del pipeline se irán exponiendo conforme se implementen.
 | Especificación OAS 3.0 | [`docs/openapi.yaml`](docs/openapi.yaml) |
 | Swagger UI | http://localhost:3000/docs (también en producción) |
 
-Importa `docs/openapi.yaml` en Bruno, Postman, Insomnia o cualquier cliente compatible con OpenAPI.
+Importa el OAS en Bruno, Postman o Insomnia para generar la colección de pruebas.
+
+### Power App — respuestas
+
+| Decisión | HTTP | Significado |
+|----------|------|-------------|
+| `APROBADO` | 201 | Solicitud válida; genera radicado GOPTC |
+| `DEVUELTO` | 422 | Campos corregibles (`issues[]` con sugerencias) |
+| `RECHAZADO` | 400 / 422 | Formato inválido o regla de negocio bloqueante |
 
 ### Power App (simulador)
 
 `POST /api/power-apps/submit` — comprobación integral de campos de la solicitud de TC LATAM Business y retorna `APROBADO`, `DEVUELTO` o `RECHAZADO` con detalle por campo (`issues[]`: código, mensaje, sugerencia).
+
+## Flujo operativo (contexto)
+
+```
+file-matching → sales-calls → power-apps → operaciones
+  → gerente de relaciones → gerente de la empresa solicitante
+  → delivery-confirmation → activation-follow-up
+```
+
+### delivery-confirmation
+
+1. Se emula ~3–4 días desde el envío físico de la tarjeta.
+2. Se envía un correo **por tarjeta** a el/los gerentes (emails en Supabase).
+3. El gerente abre una página del frontend y elige:
+   - entregó al titular → avanza pipeline a `activation-follow-up`
+   - no llegó / titular ausente / devolver al banco → reintento de correo a +1 día
 
 ## Otras etapas del pipeline (en desarrollo)
 
@@ -122,3 +125,9 @@ La respuesta trae solo conteos (sin datos de clientes). Para consultar las lista
 curl localhost:3000/api/file-matching/clientes-finales
 curl localhost:3000/api/file-matching/clientes-finales-sin-pagare
 ```
+
+**Entrega física:** operaciones arma la carpeta y la entrega al gerente de relaciones; este entrega las tarjetas al gerente de la empresa solicitante.
+
+El bloque `entrega` del submit captura la logística acordada al radicar (`tipo`, `ciudad`, `direccion`, `fechaAgendamiento`). No modela el tracking posterior de la carpeta.
+
+Scripts y esquema de BD: `scripts/`, `supabase/schema.sql`.

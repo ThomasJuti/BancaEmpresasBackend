@@ -12,3 +12,6 @@ coverage/
 
 # Excel con datos reales de clientes — no versionar ni desplegar
 docs/*.xlsx
+
+# Herramientas de agentes locales
+.atl/

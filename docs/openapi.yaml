@@ -12,8 +12,16 @@ info:
     |--------|------|-------------|
     | `GET` | `/health` | Health check del servicio |
     | `POST` | `/api/power-apps/submit` | Simulador de Power App con comprobación de campos |
+    | `GET` | `/api/sales-calls/health` | Health check de la feature de llamadas |
+    | `POST` | `/api/sales-calls/calls` | Inicia una llamada de venta vía Fonema.ia |
+    | `GET` | `/api/sales-calls/calls` | Lista las llamadas registradas |
+    | `GET` | `/api/sales-calls/calls/{id}` | Detalle de una llamada (transcript, análisis) |
+    | `GET` | `/api/sales-calls/calls/{id}/recording` | Proxy de la grabación de audio (con Range) |
+    | `POST` | `/api/sales-calls/webhooks/fonema/call-update` | Webhook Fonema: cambio de estado |
+    | `POST` | `/api/sales-calls/webhooks/fonema/end-of-call` | Webhook Fonema: fin de llamada |
+    | `POST` | `/api/sales-calls/webhooks/fonema/end-of-session` | Webhook Fonema: fin de sesión |
 
-    Otras etapas del pipeline (`file-matching`, `sales-calls`, `delivery-confirmation`, etc.)
+    Otras etapas del pipeline (`file-matching`, `delivery-confirmation`, etc.)
     se documentarán aquí conforme se expongan.
 
     ## Power App — comprobación de campos
@@ -22,6 +30,15 @@ info:
     entre secciones (empresa, tarjetahabiente, cupo, entrega, Cámara de Comercio, producto)
     y reglas de negocio. Cada problema se reporta con código, campo, mensaje y sugerencia
     de corrección cuando aplica.
+
+    ## Sales Calls — llamadas de venta (Fonema.ia)
+
+    Etapa `sales-calls` del pipeline. Se dispara una llamada saliente con un agente de voz
+    (Fonema.ia) que verifica identidad del representante (nombre, empresa, NIT) y ofrece la
+    TC LATAM Business. El resultado (grabación, transcripción y variables de análisis como
+    `identidad_verificada`, `cliente_interesado`) llega de forma asíncrona por los webhooks
+    de Fonema. La grabación se sirve vía proxy autenticado para no exponer la API key al
+    cliente. Los ejemplos usan datos sintéticos; nunca datos reales de clientes.
 
   contact:
     name: Banca Empresas — Hackathon
@@ -37,6 +54,8 @@ tags:
     description: Verificación de disponibilidad del servicio
   - name: Power Apps
     description: Simulador de solicitud TC LATAM Business
+  - name: Sales Calls
+    description: Llamadas de venta agénticas vía Fonema.ia y webhooks de resultado
 
 paths:
   /health:
@@ -172,8 +191,8 @@ paths:
                 valid: true
                 radicado: GOPTC-2026-B678F1A5
                 issues: []
-                summary: Solicitud aprobada. Operaciones puede iniciar realce y entrega de la tarjeta.
-                siguientePaso: Operaciones procesará realce, fabricación y envío. El gerente comercial hará entrega del plástico.
+                summary: Solicitud aprobada. Operaciones puede iniciar realce y armado de carpeta.
+                siguientePaso: Operaciones procesará realce, fabricación y armado de carpeta. Operaciones entregará la carpeta al gerente de relaciones, quien hará entrega de las tarjetas al gerente de la empresa solicitante.
                 submittedAt: '2026-07-09T17:00:03.141Z'
         '400':
           description: Payload inválido — campos obligatorios o formato incorrecto
@@ -237,6 +256,209 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /api/sales-calls/health:
+    get:
+      tags: [Sales Calls]
+      summary: Health check de la feature de llamadas
+      operationId: getSalesCallsHealth
+      responses:
+        '200':
+          description: Feature operativa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesCallsHealthResponse'
+              example:
+                feature: sales-calls
+                status: ok
+                provider: fonema.ia
+
+  /api/sales-calls/calls:
+    get:
+      tags: [Sales Calls]
+      summary: Listar llamadas
+      description: Devuelve las llamadas registradas, ordenadas de más reciente a más antigua.
+      operationId: listSalesCalls
+      responses:
+        '200':
+          description: Listado de llamadas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Call'
+    post:
+      tags: [Sales Calls]
+      summary: Iniciar llamada de venta
+      description: |
+        Dispara una llamada saliente con el agente de voz (Fonema.ia) al número indicado.
+        La respuesta `202` confirma el encolado con estado `queued`; el resultado final
+        (grabación, transcripción, análisis) llega después por los webhooks de Fonema.
+      operationId: initiateSalesCall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiateCallRequest'
+            example:
+              phoneNumber: '+573001234567'
+              customerName: Representante Demo
+              variables:
+                empresa: Empresa Demo SAS
+                nit: '9001234567'
+      responses:
+        '202':
+          description: Llamada encolada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Call'
+        '400':
+          description: Payload inválido — formato de teléfono u otros campos incorrectos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: VALIDATION_ERROR
+                  message: phoneNumber debe estar en formato E.164, ej. +573001234567
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/sales-calls/calls/{id}:
+    get:
+      tags: [Sales Calls]
+      summary: Detalle de una llamada
+      operationId: getSalesCall
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador interno de la llamada
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalle de la llamada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Call'
+        '404':
+          description: Llamada no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: NOT_FOUND
+                  message: Llamada no encontrada
+
+  /api/sales-calls/calls/{id}/recording:
+    get:
+      tags: [Sales Calls]
+      summary: Grabación de la llamada (proxy)
+      description: |
+        Sirve el audio de la grabación descargándolo de Fonema con la API key en el backend
+        (no se expone la credencial al cliente). Soporta `Range` para permitir seek en el
+        reproductor (responde `206 Partial Content`).
+      operationId: getSalesCallRecording
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Range
+          in: header
+          required: false
+          description: Rango de bytes solicitado, ej. `bytes=0-500000`
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audio completo
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: Fragmento de audio (respuesta a un Range)
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Grabación no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '416':
+          description: Rango solicitado no satisfacible
+
+  /api/sales-calls/webhooks/fonema/call-update:
+    post:
+      tags: [Sales Calls]
+      summary: Webhook Fonema — actualización de estado
+      description: Recibido en tiempo real cuando cambia el estado de la llamada (`initiated`, `in-progress`).
+      operationId: fonemaCallUpdateWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FonemaCallUpdateWebhook'
+      responses:
+        '204':
+          description: Evento procesado (sin contenido)
+
+  /api/sales-calls/webhooks/fonema/end-of-call:
+    post:
+      tags: [Sales Calls]
+      summary: Webhook Fonema — fin de llamada
+      description: |
+        Recibido al terminar una llamada. Trae grabación, transcripción y análisis
+        (`successEvaluation`, `structuredData`). Se correlaciona con la llamada por `session.id`.
+      operationId: fonemaEndOfCallWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FonemaEndOfCallWebhook'
+      responses:
+        '204':
+          description: Evento procesado (sin contenido)
+
+  /api/sales-calls/webhooks/fonema/end-of-session:
+    post:
+      tags: [Sales Calls]
+      summary: Webhook Fonema — fin de sesión
+      description: Recibido cuando se agotan los reintentos de marcación hacia un cliente.
+      operationId: fonemaEndOfSessionWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FonemaEndOfSessionWebhook'
+      responses:
+        '204':
+          description: Evento reconocido (sin contenido)
 
 components:
   schemas:
@@ -365,12 +587,17 @@ components:
 
     Entrega:
       type: object
+      description: |
+        Logística acordada al radicar la solicitud. No modela el tracking posterior
+        (operaciones → gerente de relaciones → gerente de empresa).
       required: [tipo, ciudad, direccion, fechaAgendamiento]
       properties:
         tipo:
           type: string
           enum: [courier, comercial]
-          description: courier = envío certificado; comercial = entrega por gerente asignado
+          description: |
+            `comercial` — entrega coordinada por gerente de relaciones.
+            `courier` — envío certificado a la dirección indicada.
         ciudad:
           type: string
           example: Bogotá
@@ -503,6 +730,232 @@ components:
           type: string
         siguientePaso:
           type: string
+
+    SalesCallsHealthResponse:
+      type: object
+      required: [feature, status, provider]
+      properties:
+        feature:
+          type: string
+          enum: [sales-calls]
+        status:
+          type: string
+          enum: [ok]
+        provider:
+          type: string
+          example: fonema.ia
+
+    InitiateCallRequest:
+      type: object
+      required: [phoneNumber]
+      properties:
+        phoneNumber:
+          type: string
+          pattern: '^\+\d{8,15}$'
+          description: Número del cliente en formato E.164
+          example: '+573001234567'
+        customerName:
+          type: string
+          maxLength: 200
+          description: Nombre del representante a contactar (se inyecta como variable del agente)
+          example: Representante Demo
+        customerEmail:
+          type: string
+          format: email
+        script:
+          type: string
+          maxLength: 5000
+          description: Guion opcional; se envía como variable `script` al agente
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+          description: Variables del agente (ej. empresa, nit) para verificar identidad
+          example:
+            empresa: Empresa Demo SAS
+            nit: '9001234567'
+        delaySeconds:
+          type: integer
+          minimum: 0
+          maximum: 3600
+          description: Segundos de espera antes de iniciar la llamada
+
+    TranscriptMessage:
+      type: object
+      required: [role, message]
+      properties:
+        role:
+          type: string
+          description: 'Emisor del turno: bot/agent (agente) o user (cliente)'
+          example: user
+        message:
+          type: string
+          example: Sí, me interesa adquirirla
+
+    Call:
+      type: object
+      description: Estado y resultado de una llamada de venta.
+      required: [id, agentId, phoneNumber, variables, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador interno de la llamada
+        sessionId:
+          type: string
+          description: Id de sesión de Fonema (correlación con webhooks)
+        fonemaCallId:
+          type: string
+          description: Id de llamada de Fonema (llega en fin-de-llamada)
+        agentId:
+          type: string
+          example: soui-XXXXXXXX
+        phoneNumber:
+          type: string
+          example: '+573001234567'
+        customerName:
+          type: string
+          example: Representante Demo
+        customerEmail:
+          type: string
+          format: email
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            empresa: Empresa Demo SAS
+            nit: '9001234567'
+        status:
+          type: string
+          enum: [queued, initiated, in_progress, completed, failed]
+        recordingUrl:
+          type: string
+          description: URL de la grabación en Fonema (requiere API key; usar el proxy)
+        detailsUrl:
+          type: string
+          description: Enlace para ver el detalle en Fonema
+        transcript:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptMessage'
+        summary:
+          type: string
+          description: Resumen automático de la llamada
+        endedReason:
+          type: string
+          example: customer-ended-call
+        durationSeconds:
+          type: integer
+          example: 156
+        successEvaluation:
+          oneOf:
+            - type: boolean
+            - type: string
+          description: Criterio de éxito evaluado por el agente (Fonema puede enviarlo como texto)
+          example: 'true'
+        structuredData:
+          type: object
+          additionalProperties: true
+          description: Variables de salida del agente
+          example:
+            identidad_verificada: Verdadero
+            cliente_interesado: Verdadero
+            motivo_no_interes: No aplica
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    FonemaCallUpdateWebhook:
+      type: object
+      description: Payload del webhook de actualización de llamada de Fonema.
+      properties:
+        event:
+          type: string
+          example: call.updated
+        status:
+          type: string
+          enum: [initiated, in-progress]
+        timestamp:
+          type: string
+          format: date-time
+        call:
+          type: object
+          properties:
+            id:
+              type: string
+        customer:
+          type: object
+          properties:
+            name:
+              type: string
+            phoneNumber:
+              type: string
+
+    FonemaEndOfCallWebhook:
+      type: object
+      description: Payload del webhook de fin de llamada de Fonema (grabación, transcript, análisis).
+      properties:
+        id:
+          type: string
+        session:
+          type: object
+          properties:
+            id:
+              type: string
+        endedReason:
+          type: string
+        durationSeconds:
+          type: integer
+        recordingURL:
+          type: string
+        detailsURL:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptMessage'
+        analysis:
+          type: object
+          properties:
+            successEvaluation:
+              oneOf:
+                - type: boolean
+                - type: string
+            structuredData:
+              type: object
+              additionalProperties: true
+            summary:
+              type: string
+
+    FonemaEndOfSessionWebhook:
+      type: object
+      description: Payload del webhook de fin de sesión de Fonema (reintentos agotados).
+      properties:
+        customer:
+          type: object
+          properties:
+            name:
+              type: string
+            phoneNumber:
+              type: string
+        totalAttempts:
+          type: integer
+        endedReason:
+          type: string
+        analysis:
+          type: object
+          properties:
+            successEvaluation:
+              oneOf:
+                - type: boolean
+                - type: string
+            structuredData:
+              type: object
+              additionalProperties: true
 
     ErrorResponse:
       type: object

@@ -141,7 +141,7 @@ function validateAgendamiento(request: PowerAppRequest): ValidationIssue[] {
         'AGENDAMIENTO_FIN_DE_SEMANA',
         'entrega.fechaAgendamiento',
         'El agendamiento solo se permite de lunes a viernes.',
-        'Seleccione un día hábil para la entrega del plástico.',
+        'Seleccione un día hábil para la entrega.',
       ),
     );
   }
