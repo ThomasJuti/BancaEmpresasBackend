@@ -30,9 +30,48 @@ file-matching (base potencial × CEC)
 ## Setup
 
 ```bash
-cp .env.example .env
+cp .env.example .env   # completar SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY
 npm install
 npm run dev
 ```
 
 Health: `GET /health`
+
+## Paso 1 — file-matching (cruce de fuentes → clientes finales)
+
+### 1. Crear las tablas
+
+Ejecutar [`supabase/schema.sql`](supabase/schema.sql) en el SQL Editor de Supabase (una sola vez).
+Crea las 3 tablas fuente (`base_potencial`, `cec`, `clientes_potenciales_grabar`) y las 2 tablas
+resultado (`clientes_finales`, `clientes_finales_sin_pagare`), con RLS habilitado sin políticas
+(solo el backend accede, vía service role).
+
+### 2. Precargar las fuentes desde Excel
+
+En producción las fuentes llegan de un sistema externo; para pruebas se precargan desde los
+Excel de `docs/` (no versionados — contienen datos reales de clientes):
+
+```bash
+npm run seed              # parsea y sube las 3 fuentes a Supabase
+npm run seed -- --dry-run # solo parsea y muestra conteos, sin tocar la base
+```
+
+### 3. Ejecutar el cruce
+
+```bash
+curl -X POST localhost:3000/api/file-matching/run
+```
+
+Genera dos listas y las persiste (regenerándolas por completo en cada corrida):
+
+| Lista | Tabla | Condiciones |
+|---|---|---|
+| Validación completa | `clientes_finales` | gestionable + sin TC (base potencial) + cupo disponible (CEC) + pagaré activo |
+| Validación sin pagaré | `clientes_finales_sin_pagare` | gestionable + sin TC (base potencial) + cupo disponible (CEC) |
+
+La respuesta trae solo conteos (sin datos de clientes). Para consultar las listas:
+
+```bash
+curl localhost:3000/api/file-matching/clientes-finales
+curl localhost:3000/api/file-matching/clientes-finales-sin-pagare
+```
