@@ -13,6 +13,9 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional().default(''),
   RESEND_FROM_EMAIL: z.string().email().optional().or(z.literal('')).default(''),
   POWERAPPS_WEBHOOK_SECRET: z.string().optional().default(''),
+  TIME_COMPRESSION_DAY_MS: z.coerce.number().int().positive().default(60_000),
+  CONFIRMATION_TOKEN_SECRET: z.string().optional().default(''),
+  FRONTEND_CONFIRMATION_URL: z.string().url().optional().or(z.literal('')).default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -44,5 +47,11 @@ export const env = {
   },
   powerApps: {
     webhookSecret: data.POWERAPPS_WEBHOOK_SECRET,
+  },
+  deliveryConfirmation: {
+    /** Milisegundos que representan 1 día emulado (default: 1 min). */
+    dayMs: data.TIME_COMPRESSION_DAY_MS,
+    tokenSecret: data.CONFIRMATION_TOKEN_SECRET,
+    frontendConfirmationUrl: data.FRONTEND_CONFIRMATION_URL || '',
   },
 } as const;

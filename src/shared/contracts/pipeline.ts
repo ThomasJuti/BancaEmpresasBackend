@@ -3,7 +3,7 @@ export type PipelineStage =
   | 'file_matching'
   | 'sales_call'
   | 'power_apps'
-  | 'activation_email'
+  | 'delivery_confirmation'
   | 'activation_follow_up'
   | 'completed'
   | 'rejected'
@@ -15,7 +15,7 @@ export const PIPELINE_ORDER: readonly PipelineStage[] = [
   'file_matching',
   'sales_call',
   'power_apps',
-  'activation_email',
+  'delivery_confirmation',
   'activation_follow_up',
   'completed',
 ] as const;
@@ -34,4 +34,12 @@ export interface PipelineCase {
   createdAt: string;
   updatedAt: string;
   metadata?: Record<string, unknown>;
+}
+
+/**
+ * Contrato para que las features avancen el pipeline sin importar
+ * internals de core/pipeline.
+ */
+export interface PipelineStageAdvancer {
+  advance(caseId: string, toStage: PipelineStage): Promise<void>;
 }
