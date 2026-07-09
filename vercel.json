@@ -3,8 +3,7 @@
   "buildCommand": "",
   "functions": {
     "src/server.ts": {
-      "maxDuration": 60,
-      "includeFiles": "docs/openapi.yaml,docs/index.html"
+      "maxDuration": 60
     }
   },
   "crons": [

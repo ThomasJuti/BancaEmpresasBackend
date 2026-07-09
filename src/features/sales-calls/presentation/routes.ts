@@ -15,7 +15,7 @@ export const salesCallsRouter = Router();
 
 // Composición de dependencias de la feature (composition root local).
 const callRepository = new InMemoryCallRepository();
-if (process.env.SEED_DEMO === 'true') {
+if (!process.env.VERCEL && process.env.SEED_DEMO === 'true') {
   void loadSeed(callRepository);
 }
 

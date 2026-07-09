@@ -106,7 +106,7 @@ Etapa `sales-calls` del pipeline: entre `file-matching` (viabilidad) y `power-ap
 - **Grabación**: se sirve vía proxy autenticado (`GET /calls/{id}/recording`, con soporte `Range`) para no exponer la API key de Fonema al frontend.
 - **Persistencia**: `InMemoryCallRepository` (demo). Para serverless/producción debe migrarse a Supabase (misma interfaz `CallRepository`).
 - **Variables de entorno**: `FONEMA_API_URL`, `FONEMA_API_KEY`, `FONEMA_SALES_AGENT_ID`. `SEED_DEMO=true` carga una llamada de ejemplo.
-- **Endpoints**: base `/api/sales-calls` (ver OAS `docs/openapi.yaml`, tag *Sales Calls*).
+- **Endpoints**: base `/api/sales-calls` (ver OAS `public/docs/openapi.yaml`, tag *Sales Calls*).
 
 ### Power App (simulador en `power-apps`)
 
@@ -153,7 +153,7 @@ Este bloque no modela la cadena operativa posterior (carpeta → gerente de rela
 
 ### Documentación API (OpenAPI)
 
-- **Fuente única de verdad del contrato HTTP**: `docs/openapi.yaml` (OpenAPI 3.0.3). Todo endpoint expuesto debe estar documentado ahí; si un endpoint no está en el OAS, se considera no publicado.
+- **Fuente única de verdad del contrato HTTP**: `public/docs/openapi.yaml` (OpenAPI 3.0.3). Todo endpoint expuesto debe estar documentado ahí; si un endpoint no está en el OAS, se considera no publicado.
 - **Swagger UI**: `GET /docs` sirve la UI y `GET /docs/openapi.yaml` la especificación (local y producción). Los Excel de `docs/*.xlsx` no se versionan ni despliegan.
 - **Sincronización obligatoria**: cualquier cambio en rutas, DTOs (schemas Zod), códigos de estado o formato de errores debe reflejarse en el OAS en el mismo cambio (mismo commit/PR), no después.
 

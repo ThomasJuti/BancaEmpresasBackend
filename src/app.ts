@@ -17,7 +17,10 @@ export function createApp() {
     res.json({ status: 'ok', service: 'banca-empresas-backend' });
   });
 
-  app.use('/docs', express.static(path.join(process.cwd(), 'docs')));
+  // En Vercel, public/docs se sirve como estático en el edge (sin fs en la función).
+  if (!process.env.VERCEL) {
+    app.use('/docs', express.static(path.join(process.cwd(), 'public', 'docs')));
+  }
   registerFeatureRoutes(app);
 
   app.use(notFoundHandler);

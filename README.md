@@ -48,7 +48,7 @@ Health en producción: `GET https://<tu-app>.vercel.app/health`
 
 | Recurso | URL |
 |---------|-----|
-| Especificación OAS 3.0 | [`docs/openapi.yaml`](docs/openapi.yaml) |
+| Especificación OAS 3.0 | [`public/docs/openapi.yaml`](public/docs/openapi.yaml) |
 | Swagger UI | http://localhost:3000/docs (también en producción) |
 
 Importa el OAS en Bruno, Postman o Insomnia para generar la colección de pruebas.
