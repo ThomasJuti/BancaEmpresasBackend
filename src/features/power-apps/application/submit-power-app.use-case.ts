@@ -16,23 +16,7 @@ export interface SubmitPowerAppResult {
 }
 
 function mapDtoToRequest(dto: SubmitPowerAppDto): PowerAppRequest {
-  return {
-    leadId: dto.leadId,
-    campana: dto.campana,
-    empresa: {
-      ...dto.empresa,
-      nit: dto.empresa.nit,
-    },
-    tarjetahabiente: dto.tarjetahabiente,
-    cupo: dto.cupo,
-    entrega: dto.entrega,
-    camaraComercio: dto.camaraComercio,
-    producto: {
-      codigo: dto.producto.codigo.toUpperCase(),
-      franquicia: dto.producto.franquicia.toUpperCase(),
-    },
-    asesorId: dto.asesorId,
-  };
+  return dto;
 }
 
 function buildRadicado(): string {
@@ -54,8 +38,8 @@ function resolveDecision(issues: ValidationIssue[]): PowerAppDecision {
 function buildSummary(decision: PowerAppDecision, errorCount: number, warningCount: number): string {
   if (decision === 'APROBADO') {
     return warningCount > 0
-      ? `Solicitud aprobada con ${warningCount} advertencia(s). Operaciones puede iniciar realce y armado de carpeta.`
-      : 'Solicitud aprobada. Operaciones puede iniciar realce y armado de carpeta.';
+      ? `Solicitud LATAM Business aprobada con ${warningCount} advertencia(s). Operaciones puede iniciar realce y armado de carpeta.`
+      : 'Solicitud LATAM Business aprobada. Operaciones puede iniciar realce y armado de carpeta.';
   }
 
   if (decision === 'DEVUELTO') {

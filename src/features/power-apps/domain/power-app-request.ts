@@ -1,52 +1,38 @@
-export interface PowerAppEmpresa {
-  nit: string;
-  razonSocial: string;
-  segmento: string;
-  ciudad: string;
-  direccion: string;
-}
+/** Solicitud completa de la Power App en un solo payload (POST /api/power-apps/submit). */
 
-export interface PowerAppTarjetahabiente {
-  tipoDocumento: 'CC' | 'CE' | 'PA' | 'TI';
-  numeroDocumento: string;
-  nombres: string;
-  apellidos: string;
-  cargo: string;
-  email: string;
-  telefono: string;
-}
+export type TipoIdentificacionEmpresa = 'NIT';
+export type TipoIdentificacionTarjetahabiente = 'CC' | 'CE' | 'PA' | 'TI';
 
-export interface PowerAppCupo {
-  solicitado: number;
-  disponibleCec?: number;
-}
-
-export interface PowerAppEntrega {
-  tipo: 'courier' | 'comercial';
-  ciudad: string;
-  direccion: string;
-  fechaAgendamiento: string;
-}
-
-export interface PowerAppCamaraComercio {
-  archivoNombre: string;
-  nitCertificado?: string;
-  fechaExpedicion?: string;
-}
-
-export interface PowerAppProducto {
-  codigo: string;
-  franquicia: string;
-}
+export type PuntoEntrega =
+  | 'PUNTO_ENTREGA_A_COMERCIAL'
+  | 'ENVIO_CERTIFICADO_COURIER';
 
 export interface PowerAppRequest {
   leadId?: string;
   campana?: string;
-  empresa: PowerAppEmpresa;
-  tarjetahabiente: PowerAppTarjetahabiente;
-  cupo: PowerAppCupo;
-  entrega: PowerAppEntrega;
-  camaraComercio: PowerAppCamaraComercio;
-  producto: PowerAppProducto;
   asesorId?: string;
+
+  segmento: string;
+  tipoIdentificacionEmpresa: TipoIdentificacionEmpresa;
+  tipoIdentificacionTarjetahabiente: TipoIdentificacionTarjetahabiente;
+  numeroIdentificacionTarjetahabiente: string;
+  unidadNegocios: string;
+  /** Siempre LATAM Business en esta campaña. */
+  tipoTarjetaNueva: string;
+  identificacionEmpresa: string;
+  nombreEmpresa: string;
+  nombreTarjetahabiente: string;
+
+  binProducto: string;
+  cargoDebitoAutomatico: string;
+  cupoTarjetaNueva: number;
+  cupoDisponibleCec?: number;
+
+  /** Imágenes/archivos del caso ("Subir imágenes del caso"). */
+  archivosAdjuntos: string[];
+
+  codigoOficinaCentroServicio: string;
+  ciudadPuntoEntrega: string;
+  direccionPuntoComercial: string;
+  puntoEntrega: PuntoEntrega;
 }

@@ -1,14 +1,12 @@
 import {
-  isValidColombianMobile,
-  isValidEmail,
   looksLikeEmpresaNit,
   looksLikeNaturalPersonDocument,
   normalizeIdentification,
 } from './colombian-id.js';
+import { isBinLatamBusiness, isTipoTarjetaLatamBusiness, TIPO_TARJETA_LATAM_BUSINESS } from './latam-business.js';
 import type { PowerAppRequest } from './power-app-request.js';
 import type { ValidationIssue } from './validation-issue.js';
 
-const PRODUCTO_ESPERADO = 'TC_LATAM_BUSINESS';
 const SEGMENTOS_ELEGIBLES = new Set([
   'pyme pequeña',
   'pyme mediana',
@@ -28,17 +26,17 @@ function issue(
   return { code, field, message, severity, suggestion };
 }
 
-function validateIdentificationSwap(request: PowerAppRequest): ValidationIssue[] {
+function validateIdentificaciones(request: PowerAppRequest): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-  const nit = normalizeIdentification(request.empresa.nit);
-  const doc = normalizeIdentification(request.tarjetahabiente.numeroDocumento);
+  const nit = normalizeIdentification(request.identificacionEmpresa);
+  const doc = normalizeIdentification(request.numeroIdentificacionTarjetahabiente);
 
   if (nit === doc) {
     issues.push(
       issue(
         'DUPLICATE_IDENTIFICATION',
-        'empresa.nit',
-        'El NIT de la empresa y el documento del tarjetahabiente son iguales.',
+        'identificacionEmpresa',
+        'La identificación de la empresa y la del tarjetahabiente son iguales.',
         'La empresa (NIT) y el tarjetahabiente (persona natural) deben ser identificaciones distintas.',
       ),
     );
@@ -46,47 +44,84 @@ function validateIdentificationSwap(request: PowerAppRequest): ValidationIssue[]
   }
 
   const nitLooksLikeCedula =
-    looksLikeNaturalPersonDocument(request.empresa.nit) && !looksLikeEmpresaNit(request.empresa.nit);
+    looksLikeNaturalPersonDocument(request.identificacionEmpresa) &&
+    !looksLikeEmpresaNit(request.identificacionEmpresa);
   const docLooksLikeNit =
-    looksLikeEmpresaNit(request.tarjetahabiente.numeroDocumento) &&
-    !looksLikeNaturalPersonDocument(request.tarjetahabiente.numeroDocumento);
+    looksLikeEmpresaNit(request.numeroIdentificacionTarjetahabiente) &&
+    !looksLikeNaturalPersonDocument(request.numeroIdentificacionTarjetahabiente);
 
   if (nitLooksLikeCedula && docLooksLikeNit) {
     issues.push(
       issue(
         'FIELD_SWAP_NIT_CEDULA',
-        'empresa.nit',
-        'Parece que el NIT de la empresa y el documento del tarjetahabiente están invertidos.',
-        `Intercambie los valores: use ${doc} como NIT de empresa y ${nit} como documento del tarjetahabiente.`,
+        'identificacionEmpresa',
+        'Parece que la identificación de la empresa y la del tarjetahabiente están invertidas.',
+        `Intercambie los valores: use ${doc} como identificación de empresa y ${nit} como número del tarjetahabiente.`,
       ),
       issue(
         'FIELD_SWAP_NIT_CEDULA',
-        'tarjetahabiente.numeroDocumento',
-        'El documento del tarjetahabiente tiene formato de NIT empresarial.',
-        'El tarjetahabiente debe ser una persona natural (cédula u otro doc. PN), no el NIT de la empresa.',
+        'numeroIdentificacionTarjetahabiente',
+        'El número del tarjetahabiente tiene formato de NIT empresarial.',
+        'El tarjetahabiente debe ser una persona natural (cédula u otro documento PN).',
       ),
     );
     return issues;
   }
 
-  if (!looksLikeEmpresaNit(request.empresa.nit)) {
+  if (!looksLikeEmpresaNit(request.identificacionEmpresa)) {
     issues.push(
       issue(
         'INVALID_FORMAT',
-        'empresa.nit',
-        'El NIT de la empresa no tiene un formato válido de persona jurídica.',
-        'Verifique que ingresó el NIT de la empresa (típicamente 9 dígitos, suele iniciar en 8 o 9) y no la cédula del tarjetahabiente.',
+        'identificacionEmpresa',
+        'La identificación de la empresa no tiene un formato válido de NIT.',
+        'Verifique que ingresó el NIT de la empresa y no la cédula del tarjetahabiente.',
       ),
     );
   }
 
-  if (!looksLikeNaturalPersonDocument(request.tarjetahabiente.numeroDocumento)) {
+  if (!looksLikeNaturalPersonDocument(request.numeroIdentificacionTarjetahabiente)) {
     issues.push(
       issue(
         'INVALID_FORMAT',
-        'tarjetahabiente.numeroDocumento',
-        'El documento del tarjetahabiente no parece corresponder a una persona natural.',
-        'Ingrese la cédula (u otro documento PN) del colaborador o representante designado, no el NIT de la empresa.',
+        'numeroIdentificacionTarjetahabiente',
+        'El número de identificación del tarjetahabiente no parece corresponder a una persona natural.',
+        'Ingrese la cédula (u otro documento PN) del colaborador o representante designado.',
+      ),
+    );
+  }
+
+  return issues;
+}
+
+function validateProductoLatamBusiness(request: PowerAppRequest): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  if (!isTipoTarjetaLatamBusiness(request.tipoTarjetaNueva)) {
+    issues.push(
+      issue(
+        'PRODUCTO_INVALIDO',
+        'tipoTarjetaNueva',
+        `En esta campaña solo se permite solicitar ${TIPO_TARJETA_LATAM_BUSINESS}.`,
+        `Seleccione "${TIPO_TARJETA_LATAM_BUSINESS}" en el campo Tipo de tarjeta nueva.`,
+      ),
+    );
+  }
+
+  if (!/^\d{6}$/.test(request.binProducto.replace(/\D/g, ''))) {
+    issues.push(
+      issue(
+        'INVALID_FORMAT',
+        'binProducto',
+        'El BIN del producto debe ser numérico de 6 dígitos.',
+      ),
+    );
+  } else if (!isBinLatamBusiness(request.binProducto)) {
+    issues.push(
+      issue(
+        'BIN_PRODUCTO_INVALIDO',
+        'binProducto',
+        'El BIN seleccionado no corresponde al producto LATAM Business.',
+        'Seleccione el BIN asociado a Tarjeta de Crédito LATAM Business.',
       ),
     );
   }
@@ -96,26 +131,28 @@ function validateIdentificationSwap(request: PowerAppRequest): ValidationIssue[]
 
 function validateCupo(request: PowerAppRequest): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-  const { solicitado, disponibleCec } = request.cupo;
 
-  if (!Number.isFinite(solicitado) || solicitado <= 0) {
+  if (!Number.isFinite(request.cupoTarjetaNueva) || request.cupoTarjetaNueva <= 0) {
     issues.push(
       issue(
         'CUPO_INVALIDO',
-        'cupo.solicitado',
-        'El cupo solicitado debe ser un valor mayor a cero.',
+        'cupoTarjetaNueva',
+        'El cupo de la tarjeta nueva debe ser un valor mayor a cero.',
       ),
     );
     return issues;
   }
 
-  if (disponibleCec !== undefined && solicitado > disponibleCec) {
+  if (
+    request.cupoDisponibleCec !== undefined &&
+    request.cupoTarjetaNueva > request.cupoDisponibleCec
+  ) {
     issues.push(
       issue(
         'CUPO_EXCEDE_DISPONIBLE',
-        'cupo.solicitado',
+        'cupoTarjetaNueva',
         'El cupo solicitado supera el disponible reportado en CEC.',
-        `El cupo máximo disponible es ${disponibleCec.toLocaleString('es-CO')}.`,
+        `El cupo máximo disponible es ${request.cupoDisponibleCec.toLocaleString('es-CO')}.`,
       ),
     );
   }
@@ -123,164 +160,69 @@ function validateCupo(request: PowerAppRequest): ValidationIssue[] {
   return issues;
 }
 
-function validateAgendamiento(request: PowerAppRequest): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
-  const fecha = new Date(`${request.entrega.fechaAgendamiento}T12:00:00`);
-
-  if (Number.isNaN(fecha.getTime())) {
-    issues.push(
-      issue('INVALID_FORMAT', 'entrega.fechaAgendamiento', 'La fecha de agendamiento no es válida.'),
-    );
-    return issues;
-  }
-
-  const day = fecha.getDay();
-  if (day === 0 || day === 6) {
-    issues.push(
+function validateAdjuntos(request: PowerAppRequest): ValidationIssue[] {
+  if (!request.archivosAdjuntos.length) {
+    return [
       issue(
-        'AGENDAMIENTO_FIN_DE_SEMANA',
-        'entrega.fechaAgendamiento',
-        'El agendamiento solo se permite de lunes a viernes.',
-        'Seleccione un día hábil para la entrega.',
+        'ADJUNTOS_REQUERIDOS',
+        'archivosAdjuntos',
+        'Debe adjuntar al menos una imagen del caso.',
+        'Use "Subir imágenes del caso" en la Power App e incluya el PDF de Cámara de Comercio.',
       ),
-    );
+    ];
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (fecha < today) {
-    issues.push(
+  const hasPdf = request.archivosAdjuntos.some((name) => name.trim().toLowerCase().endsWith('.pdf'));
+  if (!hasPdf) {
+    return [
       issue(
-        'AGENDAMIENTO_PASADO',
-        'entrega.fechaAgendamiento',
-        'La fecha de agendamiento no puede ser anterior a hoy.',
+        'ADJUNTOS_REQUERIDOS',
+        'archivosAdjuntos',
+        'Debe adjuntar el PDF de Cámara de Comercio.',
+        'Incluya un archivo .pdf del certificado de Cámara de Comercio en archivosAdjuntos.',
       ),
-    );
+    ];
   }
 
-  return issues;
+  return [];
 }
 
-function validateCamaraComercio(request: PowerAppRequest): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
-  const { camaraComercio, empresa } = request;
-
-  if (!camaraComercio.archivoNombre?.trim()) {
-    issues.push(
-      issue(
-        'CAMARA_COMERCIO_REQUERIDA',
-        'camaraComercio.archivoNombre',
-        'Debe adjuntar el certificado de Cámara de Comercio.',
-      ),
-    );
-    return issues;
-  }
-
-  const nombre = camaraComercio.archivoNombre.toLowerCase();
-  if (!nombre.endsWith('.pdf')) {
-    issues.push(
+function validateEntrega(request: PowerAppRequest): ValidationIssue[] {
+  if (!/^\d{3,4}$/.test(request.codigoOficinaCentroServicio.replace(/\D/g, ''))) {
+    return [
       issue(
         'INVALID_FORMAT',
-        'camaraComercio.archivoNombre',
-        'El certificado de Cámara de Comercio debe ser un archivo PDF.',
-        'Adjunte el certificado en formato .pdf',
-        'warning',
+        'codigoOficinaCentroServicio',
+        'El código de oficina / centro de servicio debe ser numérico (ej. 610).',
       ),
-    );
+    ];
   }
-
-  if (camaraComercio.nitCertificado) {
-    const nitEmpresa = normalizeIdentification(empresa.nit);
-    const nitCert = normalizeIdentification(camaraComercio.nitCertificado);
-    if (nitEmpresa !== nitCert) {
-      issues.push(
-        issue(
-          'CAMARA_COMERCIO_NIT_NO_COINCIDE',
-          'camaraComercio.nitCertificado',
-          'El NIT del certificado de Cámara de Comercio no coincide con el NIT de la empresa.',
-          'Verifique que el PDF corresponde a la empresa solicitante.',
-        ),
-      );
-    }
-  }
-
-  return issues;
+  return [];
 }
 
-function validateContacto(request: PowerAppRequest): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
-  const { tarjetahabiente } = request;
-
-  if (!tarjetahabiente.nombres.trim() || !tarjetahabiente.apellidos.trim()) {
-    issues.push(
-      issue(
-        'MISSING_TARJETAHABIENTE_DATA',
-        'tarjetahabiente.nombres',
-        'Debe registrar el nombre completo del tarjetahabiente.',
-      ),
-    );
-  }
-
-  if (!isValidEmail(tarjetahabiente.email)) {
-    issues.push(
-      issue(
-        'INVALID_FORMAT',
-        'tarjetahabiente.email',
-        'El correo del tarjetahabiente no es válido.',
-      ),
-    );
-  }
-
-  if (!isValidColombianMobile(tarjetahabiente.telefono)) {
-    issues.push(
-      issue(
-        'INVALID_FORMAT',
-        'tarjetahabiente.telefono',
-        'El teléfono debe ser un celular colombiano válido (10 dígitos, inicia en 3).',
-      ),
-    );
-  }
-
-  return issues;
-}
-
-function validateProductoYSegmento(request: PowerAppRequest): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
-
-  if (request.producto.codigo.toUpperCase() !== PRODUCTO_ESPERADO) {
-    issues.push(
-      issue(
-        'PRODUCTO_INVALIDO',
-        'producto.codigo',
-        `El producto debe ser ${PRODUCTO_ESPERADO}.`,
-        'La campaña actual solo permite solicitudes de Tarjeta de Crédito LATAM Business.',
-      ),
-    );
-  }
-
-  const segmento = request.empresa.segmento.trim().toLowerCase();
+function validateSegmento(request: PowerAppRequest): ValidationIssue[] {
+  const segmento = request.segmento.trim().toLowerCase();
   if (!SEGMENTOS_ELEGIBLES.has(segmento)) {
-    issues.push(
+    return [
       issue(
         'SEGMENTO_NO_ELEGIBLE',
-        'empresa.segmento',
+        'segmento',
         'El segmento de la empresa no es elegible para esta campaña.',
         'Segmentos válidos: Pyme Pequeña, Pyme Mediana, Empresarial 1, Empresarial o Corporativo.',
         'warning',
       ),
-    );
+    ];
   }
-
-  return issues;
+  return [];
 }
 
 export function validatePowerAppRequest(request: PowerAppRequest): ValidationIssue[] {
   return [
-    ...validateIdentificationSwap(request),
+    ...validateIdentificaciones(request),
+    ...validateProductoLatamBusiness(request),
     ...validateCupo(request),
-    ...validateAgendamiento(request),
-    ...validateCamaraComercio(request),
-    ...validateContacto(request),
-    ...validateProductoYSegmento(request),
+    ...validateAdjuntos(request),
+    ...validateEntrega(request),
+    ...validateSegmento(request),
   ];
 }

@@ -3,47 +3,40 @@ import { z } from 'zod';
 export const submitPowerAppSchema = z.object({
   leadId: z.string().trim().min(1).optional(),
   campana: z.string().trim().min(1).optional(),
-  empresa: z.object({
-    nit: z.string().trim().min(1, 'El NIT de la empresa es obligatorio'),
-    razonSocial: z.string().trim().min(1, 'La razón social es obligatoria'),
-    segmento: z.string().trim().min(1, 'El segmento es obligatorio'),
-    ciudad: z.string().trim().min(1, 'La ciudad de la empresa es obligatoria'),
-    direccion: z.string().trim().min(1, 'La dirección de la empresa es obligatoria'),
-  }),
-  tarjetahabiente: z.object({
-    tipoDocumento: z.enum(['CC', 'CE', 'PA', 'TI']),
-    numeroDocumento: z.string().trim().min(1, 'El documento del tarjetahabiente es obligatorio'),
-    nombres: z.string().trim().min(1, 'Los nombres del tarjetahabiente son obligatorios'),
-    apellidos: z.string().trim().min(1, 'Los apellidos del tarjetahabiente son obligatorios'),
-    cargo: z.string().trim().min(1, 'El cargo del tarjetahabiente es obligatorio'),
-    email: z.string().trim().min(1, 'El correo del tarjetahabiente es obligatorio'),
-    telefono: z.string().trim().min(1, 'El teléfono del tarjetahabiente es obligatorio'),
-  }),
-  cupo: z.object({
-    solicitado: z.number().positive('El cupo solicitado debe ser mayor a cero'),
-    disponibleCec: z.number().nonnegative().optional(),
-  }),
-  entrega: z.object({
-    tipo: z.enum(['courier', 'comercial']),
-    ciudad: z.string().trim().min(1, 'La ciudad de entrega es obligatoria'),
-    direccion: z.string().trim().min(1, 'La dirección de entrega es obligatoria'),
-    fechaAgendamiento: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha de agendamiento debe tener formato YYYY-MM-DD'),
-  }),
-  camaraComercio: z.object({
-    archivoNombre: z.string().trim().min(1, 'Debe indicar el archivo de Cámara de Comercio'),
-    nitCertificado: z.string().trim().optional(),
-    fechaExpedicion: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/)
-      .optional(),
-  }),
-  producto: z.object({
-    codigo: z.string().trim().min(1, 'El código de producto es obligatorio'),
-    franquicia: z.string().trim().min(1, 'La franquicia es obligatoria'),
-  }),
   asesorId: z.string().trim().min(1).optional(),
+
+  segmento: z.string().trim().min(1, 'El segmento es obligatorio'),
+  tipoIdentificacionEmpresa: z.literal('NIT'),
+  tipoIdentificacionTarjetahabiente: z.enum(['CC', 'CE', 'PA', 'TI']),
+  numeroIdentificacionTarjetahabiente: z
+    .string()
+    .trim()
+    .min(1, 'El número de identificación del tarjetahabiente es obligatorio'),
+  unidadNegocios: z.string().trim().min(1, 'La unidad de negocios es obligatoria'),
+  tipoTarjetaNueva: z.string().trim().min(1, 'El tipo de tarjeta nueva es obligatorio'),
+  identificacionEmpresa: z.string().trim().min(1, 'La identificación de la empresa es obligatoria'),
+  nombreEmpresa: z.string().trim().min(1, 'El nombre de la empresa es obligatorio'),
+  nombreTarjetahabiente: z.string().trim().min(1, 'El nombre del tarjetahabiente es obligatorio'),
+
+  binProducto: z.string().trim().min(1, 'El BIN del producto es obligatorio'),
+  cargoDebitoAutomatico: z.string().trim().min(1, 'El cargo de débito automático es obligatorio'),
+  cupoTarjetaNueva: z.number().positive('El cupo de la tarjeta nueva debe ser mayor a cero'),
+  cupoDisponibleCec: z.number().nonnegative().optional(),
+
+  archivosAdjuntos: z
+    .array(z.string().trim().min(1, 'Cada archivo adjunto debe tener nombre'))
+    .min(1, 'Debe adjuntar al menos una imagen del caso'),
+
+  codigoOficinaCentroServicio: z
+    .string()
+    .trim()
+    .min(1, 'El código de oficina / centro de servicio es obligatorio'),
+  ciudadPuntoEntrega: z.string().trim().min(1, 'La ciudad del punto de entrega es obligatoria'),
+  direccionPuntoComercial: z
+    .string()
+    .trim()
+    .min(1, 'La dirección del punto comercial es obligatoria'),
+  puntoEntrega: z.enum(['PUNTO_ENTREGA_A_COMERCIAL', 'ENVIO_CERTIFICADO_COURIER']),
 });
 
 export type SubmitPowerAppDto = z.infer<typeof submitPowerAppSchema>;

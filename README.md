@@ -63,7 +63,11 @@ Importa el OAS en Bruno, Postman o Insomnia para generar la colección de prueba
 
 ### Power App (simulador)
 
-`POST /api/power-apps/submit` — comprobación integral de campos de la solicitud de TC LATAM Business y retorna `APROBADO`, `DEVUELTO` o `RECHAZADO` con detalle por campo (`issues[]`: código, mensaje, sugerencia).
+`POST /api/power-apps/submit` — un solo JSON plano con todos los campos de la Power App. Producto fijo: **LATAM BUSINESS**.
+
+Campos principales: `segmento`, `identificacionEmpresa`, `nombreEmpresa`, `numeroIdentificacionTarjetahabiente`, `nombreTarjetahabiente`, `tipoTarjetaNueva`, `binProducto`, `cupoTarjetaNueva`, `archivosAdjuntos[]` (PDF Cámara de Comercio + imágenes), `codigoOficinaCentroServicio`, `ciudadPuntoEntrega`, `direccionPuntoComercial`, `puntoEntrega`.
+
+Ver esquema completo en [`public/docs/openapi.yaml`](public/docs/openapi.yaml).
 
 ## Flujo operativo (contexto)
 
@@ -128,6 +132,6 @@ curl localhost:3000/api/file-matching/clientes-finales-sin-pagare
 
 **Entrega física:** operaciones arma la carpeta y la entrega al gerente de relaciones; este entrega las tarjetas al gerente de la empresa solicitante.
 
-El bloque `entrega` del submit captura la logística acordada al radicar (`tipo`, `ciudad`, `direccion`, `fechaAgendamiento`). No modela el tracking posterior de la carpeta.
+El bloque de entrega (`codigoOficinaCentroServicio`, `ciudadPuntoEntrega`, etc.) va en el mismo payload; no modela el tracking posterior de la carpeta.
 
 Scripts y esquema de BD: `scripts/`, `supabase/schema.sql`.

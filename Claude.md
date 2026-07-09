@@ -125,11 +125,33 @@ Cuando una llamada cierra **calificada**, `BuildPowerAppPrefillUseCase` mapea su
 
 ### Power App (simulador en `power-apps`)
 
-Tras cerrar la venta telefónica, se diligencia la solicitud con los datos de empresa, tarjetahabiente, cupo, entrega, Cámara de Comercio y producto (`TC_LATAM_BUSINESS`).
+Tras cerrar la venta telefónica se diligencia la Power App. El simulador expone **un solo endpoint** que recibe **toda la solicitud en un JSON plano** — las pestañas del formulario (cliente, tarjeta, adjuntos, entrega) son solo organización del UI.
 
-**Endpoint expuesto:** `POST /api/power-apps/submit`
+**Endpoint:** `POST /api/power-apps/submit`
 
-**Comportamiento:** comprobación integral de campos — obligatorios, formatos, coherencia entre secciones y reglas de negocio. Cada problema se reporta en `issues[]` con `code`, `field`, `message`, `severity` y `suggestion` cuando aplica.
+**Campos del request (mapeo Power App → API):**
+
+| Campo Power App | Campo API |
+|-----------------|-----------|
+| Segmento | `segmento` |
+| Tipo ID identificación empresa | `tipoIdentificacionEmpresa` |
+| Tipo ID tarjetahabiente | `tipoIdentificacionTarjetahabiente` |
+| Número ID tarjetahabiente | `numeroIdentificacionTarjetahabiente` |
+| Unidad de negocios | `unidadNegocios` |
+| Tipo de tarjeta nueva | `tipoTarjetaNueva` (siempre `LATAM BUSINESS`) |
+| Identificación empresa | `identificacionEmpresa` |
+| Nombre de la empresa | `nombreEmpresa` |
+| Nombre tarjetahabiente | `nombreTarjetahabiente` |
+| Bin producto a solicitar | `binProducto` |
+| Cargo débito automático | `cargoDebitoAutomatico` |
+| Cupo tarjeta nueva | `cupoTarjetaNueva` |
+| Subir imágenes del caso | `archivosAdjuntos[]` — incluye **PDF Cámara de Comercio** (+ imágenes opcionales) |
+| Código oficina / centro de servicio | `codigoOficinaCentroServicio` |
+| Ciudad punto de entrega | `ciudadPuntoEntrega` |
+| Dirección del punto comercial | `direccionPuntoComercial` |
+| Punto de entrega | `puntoEntrega` (`PUNTO_ENTREGA_A_COMERCIAL` \| `ENVIO_CERTIFICADO_COURIER`) |
+
+**Comportamiento:** comprobación integral de campos. Cada problema en `issues[]` con `code`, `field`, `message`, `severity` y `suggestion`.
 
 **Decisiones de salida:**
 
@@ -147,16 +169,17 @@ Tras cerrar la venta telefónica, se diligencia la solicitud con los datos de em
 - Cámara de Comercio (presencia y coincidencia de NIT)
 - Producto y segmento de campaña
 
-**Bloque `entrega` (logística al radicar):**
+**Bloque de entrega (campos planos en el mismo request):**
 
-| Campo | Significado |
-|-------|-------------|
-| `tipo: comercial` | Entrega coordinada por gerente de relaciones |
-| `tipo: courier` | Envío certificado a la dirección indicada |
-| `ciudad` / `direccion` | Punto de entrega o envío |
-| `fechaAgendamiento` | Día hábil tentativo (lunes–viernes) |
+| Campo API | Significado |
+|-----------|-------------|
+| `codigoOficinaCentroServicio` | Código oficina / centro de servicio (ej. 610) |
+| `ciudadPuntoEntrega` | Ciudad del punto de entrega |
+| `direccionPuntoComercial` | Dirección del punto comercial |
+| `puntoEntrega: PUNTO_ENTREGA_A_COMERCIAL` | Entrega vía gerente de relaciones |
+| `puntoEntrega: ENVIO_CERTIFICADO_COURIER` | Envío certificado |
 
-Este bloque no modela la cadena operativa posterior (carpeta → gerente de relaciones → gerente de empresa); solo registra lo acordado en la solicitud.
+Estos campos registran lo acordado al radicar; la cadena operativa posterior (carpeta → gerente de relaciones → gerente de empresa) ocurre fuera del submit.
 
 ### Agendamiento y ANS (referencia operativa)
 
