@@ -18,7 +18,6 @@ npm run dev
 
 Servicio en `http://localhost:3000`.
 
-## API expuesta
 ## Despliegue
 
 ### Supabase
@@ -45,8 +44,12 @@ Health en producción: `GET https://<tu-app>.vercel.app/health`
 | `GET` | `/health` | Health check |
 | `POST` | `/api/power-apps/submit` | Simulador Power App — comprobación de campos |
 
-Documentación interactiva: **http://localhost:3000/docs**  
-Especificación: [`docs/openapi.yaml`](docs/openapi.yaml)
+## Documentación API (OpenAPI)
+
+| Recurso | URL |
+|---------|-----|
+| Especificación OAS 3.0 | [`public/docs/openapi.yaml`](public/docs/openapi.yaml) |
+| Swagger UI | http://localhost:3000/docs (también en producción) |
 
 Importa el OAS en Bruno, Postman o Insomnia para generar la colección de pruebas.
 
@@ -58,13 +61,25 @@ Importa el OAS en Bruno, Postman o Insomnia para generar la colección de prueba
 | `DEVUELTO` | 422 | Campos corregibles (`issues[]` con sugerencias) |
 | `RECHAZADO` | 400 / 422 | Formato inválido o regla de negocio bloqueante |
 
+### Power App (simulador)
+
+`POST /api/power-apps/submit` — comprobación integral de campos de la solicitud de TC LATAM Business y retorna `APROBADO`, `DEVUELTO` o `RECHAZADO` con detalle por campo (`issues[]`: código, mensaje, sugerencia).
+
 ## Flujo operativo (contexto)
 
 ```
 file-matching → sales-calls → power-apps → operaciones
   → gerente de relaciones → gerente de la empresa solicitante
   → delivery-confirmation → activation-follow-up
-`POST /api/power-apps/submit` — comprobación integral de campos de la solicitud de TC LATAM Business y retorna `APROBADO`, `DEVUELTO` o `RECHAZADO` con detalle por campo (`issues[]`: código, mensaje, sugerencia).
+```
+
+### delivery-confirmation
+
+1. Se emula ~3–4 días desde el envío físico de la tarjeta.
+2. Se envía un correo **por tarjeta** a el/los gerentes (emails en Supabase).
+3. El gerente abre una página del frontend y elige:
+   - entregó al titular → avanza pipeline a `activation-follow-up`
+   - no llegó / titular ausente / devolver al banco → reintento de correo a +1 día
 
 ## Otras etapas del pipeline (en desarrollo)
 
@@ -91,11 +106,28 @@ npm run seed              # parsea y sube las 3 fuentes a Supabase
 npm run seed -- --dry-run # solo parsea y muestra conteos, sin tocar la base
 ```
 
+### 3. Ejecutar el cruce
+
+```bash
+curl -X POST localhost:3000/api/file-matching/run
+```
+
+Genera dos listas y las persiste (regenerándolas por completo en cada corrida):
+
+| Lista | Tabla | Condiciones |
+|---|---|---|
+| Validación completa | `clientes_finales` | gestionable + sin TC (base potencial) + cupo disponible (CEC) + pagaré activo |
+| Validación sin pagaré | `clientes_finales_sin_pagare` | gestionable + sin TC (base potencial) + cupo disponible (CEC) |
+
+La respuesta trae solo conteos (sin datos de clientes). Para consultar las listas:
+
+```bash
+curl localhost:3000/api/file-matching/clientes-finales
+curl localhost:3000/api/file-matching/clientes-finales-sin-pagare
+```
+
 **Entrega física:** operaciones arma la carpeta y la entrega al gerente de relaciones; este entrega las tarjetas al gerente de la empresa solicitante.
 
 El bloque `entrega` del submit captura la logística acordada al radicar (`tipo`, `ciudad`, `direccion`, `fechaAgendamiento`). No modela el tracking posterior de la carpeta.
 
-## Otras etapas (código interno, sin API pública aún)
-
-`file-matching`, `sales-calls`, `delivery-confirmation`, `activation-follow-up`.  
 Scripts y esquema de BD: `scripts/`, `supabase/schema.sql`.

@@ -6,7 +6,7 @@
   "description": "Pipeline de venta de tarjetas de crédito con HITL — Banca Empresas",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch src/dev-server.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/dev-server.ts",
     "build": "echo \"Vercel bundles server.ts automatically\"",
     "compile": "tsc",
     "start": "node dist/server.js",

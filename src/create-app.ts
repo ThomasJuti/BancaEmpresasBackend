@@ -1,10 +1,10 @@
+import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import helmetImport from 'helmet';
 import { errorHandler } from './shared/middlewares/error-handler.js';
 import { notFoundHandler } from './shared/middlewares/not-found.js';
 import { registerFeatureRoutes } from './routes.js';
-import { docsRouter } from './infrastructure/docs/docs.routes.js';
 
 export function createApp() {
   const app = express();
@@ -21,7 +21,10 @@ export function createApp() {
     res.json({ status: 'ok', service: 'banca-empresas-backend' });
   });
 
-  app.use('/docs', docsRouter);
+  // En Vercel, public/docs se sirve como estático en el edge (sin fs en la función).
+  if (!process.env.VERCEL) {
+    app.use('/docs', express.static(path.join(process.cwd(), 'public', 'docs')));
+  }
   registerFeatureRoutes(app);
 
   app.use(notFoundHandler);

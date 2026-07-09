@@ -10,8 +10,11 @@ coverage/
 .turbo/
 *.tsbuildinfo
 
-# Datos reales de clientes para el seed local — no versionar
+# Excel con datos reales de clientes — no versionar ni desplegar
 docs/*.xlsx
+
+# Supabase CLI: cache/estado local del proyecto (no versionar)
+supabase/.temp/
 
 # Herramientas de agentes locales
 .atl/
