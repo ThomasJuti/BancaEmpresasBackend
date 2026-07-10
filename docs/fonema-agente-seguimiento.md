@@ -2,7 +2,8 @@
 
 Prompt del **agente de seguimiento** (etapa `activation-follow-up`). Pegar en el
 dashboard de Fonema como prompt del agente y copiar su `agentId` en la variable
-de entorno `FONEMA_FOLLOWUP_AGENT_ID`. Configurar también los webhooks
+de entorno `FONEMA_FOLLOWUP_AGENT_ID` (y la API key de esa cuenta en
+`FONEMA_FOLLOWUP_API_KEY`). Configurar también los webhooks
 (`call-update`, `end-of-call`, `end-of-session`) apuntando a
 `/api/sales-calls/webhooks/fonema/*` (mismos del agente de ventas).
 

@@ -105,7 +105,7 @@ Etapa `sales-calls` del pipeline: entre `file-matching` (viabilidad) y `power-ap
 - **Integración Fonema**: `POST /v2/initiate-call` para disparar; el resultado (grabación, transcripción, análisis con `identidad_verificada`, `cliente_interesado`) llega asíncrono por **webhooks** (`call-update`, `end-of-call`, `end-of-session`) que se configuran en el dashboard del agente. Correlación por `session.id`.
 - **Grabación**: se sirve vía proxy autenticado (`GET /calls/{id}/recording`, con soporte `Range`) para no exponer la API key de Fonema al frontend.
 - **Persistencia**: `SupabaseCallRepository` (durable, tabla `calls`), requerido por serverless. `InMemoryCallRepository` se conserva para tests/seed. Ambos implementan la misma interfaz `CallRepository`.
-- **Variables de entorno**: `FONEMA_API_URL`, `FONEMA_API_KEY`, `FONEMA_SALES_AGENT_ID` (+ Supabase para persistencia durable). `SEED_DEMO=true` carga una llamada de ejemplo en memoria.
+- **Variables de entorno**: ventas — `FONEMA_API_URL`, `FONEMA_API_KEY`, `FONEMA_SALES_AGENT_ID`; seguimiento — `FONEMA_FOLLOWUP_API_KEY`, `FONEMA_FOLLOWUP_AGENT_ID` (segunda cuenta). (+ Supabase para persistencia durable). `SEED_DEMO=true` carga una llamada de ejemplo en memoria.
 - **Endpoints**: base `/api/sales-calls` (ver OAS `public/docs/openapi.yaml`, tag *Sales Calls*).
 
 #### Persistencia de lo que devuelve Fonema (tabla `calls`)
@@ -206,7 +206,7 @@ Estos campos registran lo acordado al radicar; la cadena operativa posterior (ca
 
 ### Activation Follow-up (seguimiento de uso de la TC — Fonema)
 
-Última etapa del pipeline. La TC se **inactiva a los 90 días sin uso**; esta feature monitorea el uso y llama con un **agente Fonema de seguimiento** (`FONEMA_FOLLOWUP_AGENT_ID`; prompt en `docs/fonema-agente-seguimiento.md`, variable `tipo_llamada` distingue los dos modos).
+Última etapa del pipeline. La TC se **inactiva a los 90 días sin uso**; esta feature monitorea el uso y llama con un **agente Fonema de seguimiento** (`FONEMA_FOLLOWUP_API_KEY` + `FONEMA_FOLLOWUP_AGENT_ID` de una segunda cuenta Fonema; prompt en `docs/fonema-agente-seguimiento.md`, variable `tipo_llamada` distingue los dos modos).
 
 - **Disparador 1 — felicitación**: la primera vez que se marca el check "entrega de la TC finalizada" (punto 5 del portafolio en el front) → `POST /api/activation-follow-up/cases` crea el caso (idempotente por `cliente_id`), dispara la llamada `felicitacion` (best-effort) y avanza el pipeline a `activation_follow_up`.
 - **Disparador 2 — recordatorio por inactividad**: cron `GET|POST /api/activation-follow-up/cron/process-reminders` (Vercel Cron; en local scheduler cada 5 s). Cadencia (`domain/follow-up-policy.ts`, días emulados con `TIME_COMPRESSION_DAY_MS`): mes 1 (día 30–59) **una** llamada por ciclo de uso; mes 2 (60–89) cada 15 días (riesgo desde el 75); mes 3 (≥90) semanal hasta uso o cancelación. Registrar uso reinicia el ciclo.

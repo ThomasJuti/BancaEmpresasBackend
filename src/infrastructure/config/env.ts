@@ -9,6 +9,8 @@ const envSchema = z.object({
   FONEMA_API_URL: z.string().url().optional().or(z.literal('')),
   FONEMA_API_KEY: z.string().optional().default(''),
   FONEMA_SALES_AGENT_ID: z.string().optional().default(''),
+  /** API key de la segunda cuenta Fonema (agente de seguimiento). */
+  FONEMA_FOLLOWUP_API_KEY: z.string().optional().default(''),
   FONEMA_FOLLOWUP_AGENT_ID: z.string().optional().default(''),
   RESEND_API_KEY: z.string().optional().default(''),
   RESEND_FROM_EMAIL: z.string().email().optional().or(z.literal('')).default(''),
@@ -62,6 +64,7 @@ export const env = {
     apiUrl: data.FONEMA_API_URL || '',
     apiKey: data.FONEMA_API_KEY,
     salesAgentId: data.FONEMA_SALES_AGENT_ID,
+    followUpApiKey: data.FONEMA_FOLLOWUP_API_KEY,
     followUpAgentId: data.FONEMA_FOLLOWUP_AGENT_ID,
   },
   resend: {

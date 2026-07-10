@@ -98,10 +98,10 @@ export function getSalesCallsDeps(): SalesCallsDeps {
 /**
  * Implementación del contrato FollowUpCallService (shared/contracts) para que
  * activation-follow-up dispare llamadas del agente de seguimiento sin importar
- * internals de esta feature. Usa FONEMA_FOLLOWUP_AGENT_ID (agente distinto al
- * de ventas) y persiste en la misma tabla `calls` (visible en /llamadas y
- * cerrada por los mismos webhooks). Construcción perezosa: valida config en la
- * primera llamada, no al arrancar.
+ * internals de esta feature. Usa FONEMA_FOLLOWUP_API_KEY + FONEMA_FOLLOWUP_AGENT_ID
+ * (cuenta/agente distintos a ventas) y persiste en la misma tabla `calls`
+ * (visible en /llamadas y cerrada por los mismos webhooks). Construcción
+ * perezosa: valida config en la primera llamada, no al arrancar.
  */
 class FonemaFollowUpCallService implements FollowUpCallService {
   private initiateCall: InitiateCallUseCase | null = null;
@@ -123,14 +123,14 @@ class FonemaFollowUpCallService implements FollowUpCallService {
   private getUseCase(): InitiateCallUseCase {
     if (this.initiateCall) return this.initiateCall;
 
-    if (!env.fonema.apiUrl || !env.fonema.apiKey || !env.fonema.followUpAgentId) {
+    if (!env.fonema.apiUrl || !env.fonema.followUpApiKey || !env.fonema.followUpAgentId) {
       throw new Error(
-        'Agente de seguimiento Fonema no configurado. Set FONEMA_API_URL, FONEMA_API_KEY y FONEMA_FOLLOWUP_AGENT_ID.',
+        'Agente de seguimiento Fonema no configurado. Set FONEMA_API_URL, FONEMA_FOLLOWUP_API_KEY y FONEMA_FOLLOWUP_AGENT_ID.',
       );
     }
 
     this.initiateCall = new InitiateCallUseCase(
-      new FonemaHttpGateway(env.fonema.apiUrl, env.fonema.apiKey),
+      new FonemaHttpGateway(env.fonema.apiUrl, env.fonema.followUpApiKey),
       new SupabaseCallRepository(getSupabaseClient()),
       env.fonema.followUpAgentId,
     );

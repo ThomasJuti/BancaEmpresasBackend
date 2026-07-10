@@ -22,7 +22,7 @@ export interface FollowUpCallResult {
 /**
  * Contrato para que activation-follow-up dispare llamadas del agente de
  * seguimiento sin importar internals de sales-calls. sales-calls lo implementa
- * (usa FONEMA_FOLLOWUP_AGENT_ID) y el composition root lo inyecta.
+ * (usa FONEMA_FOLLOWUP_API_KEY + FONEMA_FOLLOWUP_AGENT_ID) y el composition root lo inyecta.
  */
 export interface FollowUpCallService {
   initiate(input: FollowUpCallInput): Promise<FollowUpCallResult>;
