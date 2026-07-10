@@ -25,6 +25,21 @@ sql_paths = ["./seed.sql"]
 enabled = true
 port = 54323
 
+# NOTA: config.toml SOLO configura el stack LOCAL (`supabase start`). La config
+# del proyecto remoto (site_url y redirect URLs de producción, y habilitar
+# Google) se gestiona en el dashboard de Supabase, no aquí.
 [auth]
 enabled = true
-site_url = "http://localhost:3000"
+site_url = "http://localhost:4200"
+additional_redirect_urls = [
+  "http://localhost:4200",
+  "http://localhost:4200/auth/callback",
+]
+
+# Inicio de sesión con Google en el stack local. Los valores sensibles se leen de
+# variables de entorno (`supabase/.env`, ignorado por git); nunca van en el repo.
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
+skip_nonce_check = false
