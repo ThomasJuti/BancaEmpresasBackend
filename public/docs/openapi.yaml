@@ -12,6 +12,7 @@ info:
     |--------|------|-------------|
     | `GET` | `/health` | Health check del servicio |
     | `POST` | `/api/power-apps/submit` | Simulador de Power App con comprobación de campos |
+    | `GET` | `/api/power-apps/submissions/by-lead/{leadId}` | Última solicitud Power App aprobada por lead |
     | `GET` | `/api/sales-calls/health` | Health check de la feature de llamadas |
     | `POST` | `/api/sales-calls/calls` | Inicia una llamada de venta vía Fonema.ia |
     | `GET` | `/api/sales-calls/calls` | Lista las llamadas registradas |
@@ -250,6 +251,69 @@ paths:
                     summary: 'Solicitud rechazada: se encontraron errores que impiden continuar.'
                     siguientePaso: Revise los errores reportados antes de reintentar.
                     submittedAt: '2026-07-09T17:00:03.165Z'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/power-apps/submissions/by-lead/{leadId}:
+    get:
+      tags: [Power Apps]
+      summary: Consultar última solicitud Power App aprobada por lead
+      description: |
+        Devuelve la solicitud Power App válida más reciente asociada al `leadId`
+        (NIT normalizado). Incluye radicado, decisión, resumen y payload con los
+        campos diligenciados (sin contenido binario de adjuntos).
+      operationId: getPowerAppSubmissionByLead
+      parameters:
+        - name: leadId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Identificador del lead (típicamente NIT de la empresa)
+      responses:
+        '200':
+          description: Solicitud encontrada o ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PowerAppSubmissionByLeadResponse'
+              examples:
+                conSolicitud:
+                  summary: Lead con solicitud aprobada
+                  value:
+                    submission:
+                      id: 3f8a1b2c-4d5e-6f78-9012-3456789abcde
+                      caseId: ad827940-aa07-4f27-8086-539b03a15c9c
+                      leadId: '8000194370'
+                      radicado: GOPTC-2026-B678F1A5
+                      decision: APROBADO
+                      valid: true
+                      summary: Solicitud LATAM Business aprobada.
+                      siguientePaso: Operaciones procesará realce, fabricación y armado de carpeta.
+                      payload:
+                        segmento: Corporativo
+                        identificacionEmpresa: '8000194370'
+                        nombreEmpresa: CORRUGADOS DEL DARIEN S.A.S
+                        cupoTarjetaNueva: 1000000000
+                      issues: []
+                      attachmentNames:
+                        - camara_comercio_8000194370.pdf
+                      documentoOrigen: RUES
+                      submittedAt: '2026-07-09T17:00:03.141Z'
+                sinSolicitud:
+                  summary: Lead sin solicitud aprobada
+                  value:
+                    submission: null
+        '400':
+          description: leadId ausente o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Error interno del servidor
           content:
@@ -973,6 +1037,107 @@ components:
         submittedAt:
           type: string
           format: date-time
+
+    PowerAppSubmissionPayload:
+      type: object
+      description: Campos diligenciados en la solicitud (sin blobs de adjuntos)
+      properties:
+        segmento:
+          type: string
+        tipoIdentificacionEmpresa:
+          type: string
+        tipoIdentificacionTarjetahabiente:
+          type: string
+        numeroIdentificacionTarjetahabiente:
+          type: string
+        unidadNegocios:
+          type: string
+        tipoTarjetaNueva:
+          type: string
+        identificacionEmpresa:
+          type: string
+        nombreEmpresa:
+          type: string
+        nombreTarjetahabiente:
+          type: string
+        binProducto:
+          type: string
+        cargoDebitoAutomatico:
+          type: string
+        cupoTarjetaNueva:
+          type: number
+        cupoDisponibleCec:
+          type: number
+        codigoOficinaCentroServicio:
+          type: string
+        ciudadPuntoEntrega:
+          type: string
+        direccionPuntoComercial:
+          type: string
+        puntoEntrega:
+          type: string
+
+    PowerAppSubmissionRecord:
+      type: object
+      required:
+        - id
+        - caseId
+        - leadId
+        - decision
+        - valid
+        - payload
+        - issues
+        - attachmentNames
+        - submittedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        caseId:
+          type: string
+          format: uuid
+        leadId:
+          type: string
+        radicado:
+          type: string
+          nullable: true
+        decision:
+          type: string
+          enum: [APROBADO, RECHAZADO, DEVUELTO]
+        valid:
+          type: boolean
+        summary:
+          type: string
+        siguientePaso:
+          type: string
+          nullable: true
+        payload:
+          $ref: '#/components/schemas/PowerAppSubmissionPayload'
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationIssue'
+        attachmentNames:
+          type: array
+          items:
+            type: string
+        documentoOrigen:
+          type: string
+          enum: [RUES, MANUAL]
+        ruesSolicitudId:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+
+    PowerAppSubmissionByLeadResponse:
+      type: object
+      required: [submission]
+      properties:
+        submission:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/PowerAppSubmissionRecord'
 
     PowerAppValidationErrorResponse:
       type: object

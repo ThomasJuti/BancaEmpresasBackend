@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createSubmitPowerAppHandler } from './power-apps.controller.js';
+import { createSubmitPowerAppHandler, getPowerAppSubmissionByLeadHandler } from './power-apps.controller.js';
 import { consultarRuesHandler, ruesHealthHandler } from './rues.controller.js';
 import type { ShipmentScheduler } from '../../../shared/contracts/shipment-scheduler.js';
 
@@ -13,6 +13,10 @@ export function createPowerAppsRouter(shipmentScheduler: ShipmentScheduler): Rou
 
   router.post('/submit', (req, res, next) => {
     submitPowerAppHandler(req, res, next).catch(next);
+  });
+
+  router.get('/submissions/by-lead/:leadId', (req, res, next) => {
+    getPowerAppSubmissionByLeadHandler(req, res, next).catch(next);
   });
 
   router.get('/rues/health', (req, res, next) => {

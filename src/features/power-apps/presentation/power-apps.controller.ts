@@ -6,6 +6,7 @@ import { getSupabaseClient } from '../../../infrastructure/database/supabase.js'
 import { submitPowerAppOrchestrator } from '../application/submit-power-app.orchestrator.js';
 import { submitPowerAppSchema } from '../application/dtos/submit-power-app.dto.js';
 import type { ValidationIssue } from '../domain/validation-issue.js';
+import { SupabasePowerAppSubmissionRepository } from '../infrastructure/supabase-power-app-submission.repository.js';
 import type { ShipmentScheduler } from '../../../shared/contracts/shipment-scheduler.js';
 
 function mapZodIssues(error: ZodError): ValidationIssue[] {
@@ -46,6 +47,7 @@ export function createSubmitPowerAppHandler(shipmentScheduler: ShipmentScheduler
       const supabase = getSupabaseClient();
       const result = await submitPowerAppOrchestrator(parsed.data, {
         cases: new SupabasePipelineCaseRepository(supabase),
+        submissions: new SupabasePowerAppSubmissionRepository(supabase),
         pipeline: new SupabasePipelineStageAdvancer(supabase),
         shipmentScheduler,
       });
@@ -56,4 +58,26 @@ export function createSubmitPowerAppHandler(shipmentScheduler: ShipmentScheduler
       next(error);
     }
   };
+}
+
+export async function getPowerAppSubmissionByLeadHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const leadId = String(req.params.leadId ?? '').trim();
+    if (!leadId) {
+      res.status(400).json({ message: 'leadId es obligatorio' });
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    const submissions = new SupabasePowerAppSubmissionRepository(supabase);
+    const submission = await submissions.findLatestByLeadId(leadId);
+
+    res.json({ submission });
+  } catch (error) {
+    next(error);
+  }
 }
