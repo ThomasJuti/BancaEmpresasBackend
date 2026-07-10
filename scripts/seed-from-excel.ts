@@ -28,11 +28,41 @@ interface SourceConfig {
   /** Columna llave del cruce: las filas sin este valor se descartan */
   keyColumn: string;
   columns: ColumnMapping[];
+  /** Transformación opcional sobre las filas ya parseadas (p. ej. datos de contacto de prueba). */
+  augment?: (rows: Record<string, unknown>[]) => void;
 }
 
 // npm ejecuta los scripts con cwd en la raíz del paquete
 const DOCS_DIR = path.resolve(process.cwd(), 'docs');
 const BATCH_SIZE = 1000;
+
+/**
+ * Contactos de prueba (demo): correo y teléfono emparejados por contacto.
+ * Se reparten por partes iguales sobre base_potencial. No son datos reales de clientes.
+ */
+const CONTACTOS_DEMO = [
+  { correo: 'mesacalderon@gmail.com', telefono: '3224118118' },
+  { correo: 'thomasjuti1210@gmail.com', telefono: '3142016630' },
+  { correo: 'juannicolastorrente@gmail.com', telefono: '3157294645' },
+  { correo: 'bryanalexanderbogota@gmail.com', telefono: '3104083853' },
+] as const;
+
+/**
+ * Asigna a cada fila un contacto (correo + teléfono) repartido por partes iguales
+ * y de forma aleatoria: construye buckets balanceados y los baraja (Fisher–Yates).
+ */
+function asignarContactosDemo(rows: Record<string, unknown>[]): void {
+  const buckets = rows.map((_, i) => i % CONTACTOS_DEMO.length);
+  for (let i = buckets.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [buckets[i], buckets[j]] = [buckets[j], buckets[i]];
+  }
+  rows.forEach((row, i) => {
+    const contacto = CONTACTOS_DEMO[buckets[i]];
+    row.correo = contacto.correo;
+    row.telefono = contacto.telefono;
+  });
+}
 
 const sources: SourceConfig[] = [
   {
@@ -40,6 +70,7 @@ const sources: SourceConfig[] = [
     sheet: 'DATA',
     table: 'base_potencial',
     keyColumn: 'cliente_id',
+    augment: asignarContactosDemo,
     columns: [
       { header: 'Cliente_Id', column: 'cliente_id', type: 'text' },
       { header: 'Cliente_Nombre', column: 'cliente_nombre', type: 'text' },
@@ -190,6 +221,7 @@ async function parseSource(source: SourceConfig): Promise<Record<string, unknown
   if (skippedWithoutKey > 0) {
     console.warn(`  ${source.table}: ${skippedWithoutKey} filas descartadas sin ${source.keyColumn}`);
   }
+  source.augment?.(rows);
   return rows;
 }
 

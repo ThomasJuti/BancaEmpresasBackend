@@ -14,7 +14,9 @@ create table if not exists base_potencial (
   ciudad text,
   direccion text,
   subsegmento text,
-  producto_tc text
+  producto_tc text,
+  correo text,
+  telefono text
 );
 
 create index if not exists idx_base_potencial_cliente_id
