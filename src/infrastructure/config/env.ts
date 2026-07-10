@@ -12,6 +12,8 @@ const envSchema = z.object({
   FONEMA_FOLLOWUP_AGENT_ID: z.string().optional().default(''),
   RESEND_API_KEY: z.string().optional().default(''),
   RESEND_FROM_EMAIL: z.string().email().optional().or(z.literal('')).default(''),
+  GMAIL_USER: z.string().email().optional().or(z.literal('')).default(''),
+  GMAIL_APP_PASSWORD: z.string().optional().default(''),
   POWERAPPS_WEBHOOK_SECRET: z.string().optional().default(''),
   TIME_COMPRESSION_DAY_MS: z.coerce.number().int().positive().default(60_000),
   CONFIRMATION_TOKEN_SECRET: z.string().optional().default(''),
@@ -65,6 +67,10 @@ export const env = {
   resend: {
     apiKey: data.RESEND_API_KEY,
     fromEmail: data.RESEND_FROM_EMAIL,
+  },
+  gmail: {
+    user: data.GMAIL_USER,
+    appPassword: data.GMAIL_APP_PASSWORD,
   },
   powerApps: {
     webhookSecret: data.POWERAPPS_WEBHOOK_SECRET,

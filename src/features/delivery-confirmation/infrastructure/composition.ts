@@ -11,7 +11,7 @@ import {
   ClientesFinalesManagerDirectory,
 } from './supabase-repository.js';
 import { HmacConfirmationTokenService } from './token-service.js';
-import { ResendDeliveryEmailSender } from './resend-email-sender.js';
+import { NodemailerGmailEmailSender } from './nodemailer-gmail-email-sender.js';
 import { DemoShipmentScheduler } from './demo-shipment-scheduler.js';
 
 export interface DeliveryConfirmationDeps {
@@ -40,7 +40,9 @@ export function getDeliveryConfirmationDeps(): DeliveryConfirmationDeps {
     // DEMO: destinatario tomado de clientes_finales.correo en vez de
     // company_managers. Volver a SupabaseManagerDirectory para producción.
     managers: new ClientesFinalesManagerDirectory(db),
-    emailSender: new ResendDeliveryEmailSender(env.resend.apiKey, env.resend.fromEmail),
+    // DEMO: envío por SMTP de Gmail (App Password) para poder mandar a los
+    // socios sin verificar dominio. Volver a ResendDeliveryEmailSender para prod.
+    emailSender: new NodemailerGmailEmailSender(env.gmail.user, env.gmail.appPassword),
     tokens: new HmacConfirmationTokenService(env.deliveryConfirmation.tokenSecret),
     pipeline: new SupabasePipelineStageAdvancer(db),
     dayMs: env.deliveryConfirmation.dayMs,
