@@ -87,6 +87,8 @@ export class BuildClientesFinalesUseCase {
         subsegmento: cliente.subsegmento,
         cupoDisponible: cec.disponible,
         leaAprobado: cec.leaAprobado,
+        correo: cliente.correo,
+        telefono: cliente.telefono,
       });
     }
 

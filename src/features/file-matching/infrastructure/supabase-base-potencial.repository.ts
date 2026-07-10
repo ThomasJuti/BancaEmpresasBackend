@@ -19,6 +19,8 @@ interface BasePotencialRow {
   cliente_nombre: string | null;
   ciudad: string | null;
   subsegmento: string | null;
+  correo: string | null;
+  telefono: string | null;
 }
 
 export class SupabaseBasePotencialRepository implements BasePotencialRepository {
@@ -30,7 +32,7 @@ export class SupabaseBasePotencialRepository implements BasePotencialRepository 
     for (const ids of chunk(clienteIds, IN_CHUNK_SIZE)) {
       const { data, error } = await this.supabase
         .from('base_potencial')
-        .select('cliente_id, cliente_nombre, ciudad, subsegmento')
+        .select('cliente_id, cliente_nombre, ciudad, subsegmento, correo, telefono')
         .in('cliente_id', ids)
         .eq('cliente_gestionable', 'Gestionable')
         .eq('producto_tc', 'SIN TC')
@@ -50,6 +52,8 @@ export class SupabaseBasePotencialRepository implements BasePotencialRepository 
           clienteNombre: row.cliente_nombre,
           ciudad: row.ciudad,
           subsegmento: row.subsegmento,
+          correo: row.correo,
+          telefono: row.telefono,
         });
       }
     }

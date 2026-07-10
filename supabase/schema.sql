@@ -75,6 +75,8 @@ create table if not exists clientes_finales (
   subsegmento text,
   cupo_disponible numeric,
   lea_aprobado numeric,
+  correo text,
+  telefono text,
   creado_en timestamptz not null default now()
 );
 
@@ -86,6 +88,8 @@ create table if not exists clientes_finales_sin_pagare (
   subsegmento text,
   cupo_disponible numeric,
   lea_aprobado numeric,
+  correo text,
+  telefono text,
   creado_en timestamptz not null default now()
 );
 
