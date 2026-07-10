@@ -28,11 +28,20 @@ export class DemoShipmentScheduler implements ShipmentScheduler {
   async scheduleShipment(input: ScheduleShipmentInput): Promise<void> {
     const deps = this.resolveDeps();
 
-    // Idempotencia: card_id es unique pero case_id no, y fabricamos un cardId
-    // nuevo por llamada. Sin este guard, reenviar el mismo caso duplicaría el
-    // envío (y el correo). Si ya hay un envío para el caso, no reprogramamos.
     const existing = await deps.repository.findByCaseId(input.caseId);
-    if (existing) return;
+    if (existing) {
+      // Re-submit desde el front (misma pipeline case): no silenciar el correo.
+      if (existing.status !== 'scheduled' && existing.status !== 'retry_scheduled') {
+        await deps.repository.scheduleRetry(existing.id, 'not_arrived', new Date());
+      }
+      const processed = await processDueEmails(deps, { pipelineCaseId: input.caseId });
+      if (processed === 0) {
+        console.warn(
+          `delivery-confirmation: re-submit for pipeline case ${input.caseId} did not dispatch email`,
+        );
+      }
+      return;
+    }
 
     const now = new Date().toISOString();
     await deps.repository.create({
@@ -45,6 +54,11 @@ export class DemoShipmentScheduler implements ShipmentScheduler {
       emailScheduledAt: now,
     });
 
-    await processDueEmails(deps);
+    const processed = await processDueEmails(deps, { pipelineCaseId: input.caseId });
+    if (processed === 0) {
+      console.warn(
+        `delivery-confirmation: new shipment for pipeline case ${input.caseId} did not dispatch email`,
+      );
+    }
   }
 }

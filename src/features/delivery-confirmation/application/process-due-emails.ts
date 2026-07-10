@@ -16,8 +16,14 @@ export interface ProcessDueEmailsDeps {
  * firmado y marca el caso como awaiting_confirmation.
  * Devuelve cuántos casos procesó.
  */
-export async function processDueEmails(deps: ProcessDueEmailsDeps): Promise<number> {
-  const dueCases = await deps.repository.findDue(new Date());
+export async function processDueEmails(
+  deps: ProcessDueEmailsDeps,
+  options?: { pipelineCaseId?: string },
+): Promise<number> {
+  let dueCases = await deps.repository.findDue(new Date());
+  if (options?.pipelineCaseId) {
+    dueCases = dueCases.filter((dueCase) => dueCase.caseId === options.pipelineCaseId);
+  }
 
   for (const dueCase of dueCases) {
     const isRetry = dueCase.attemptCount > 0;
