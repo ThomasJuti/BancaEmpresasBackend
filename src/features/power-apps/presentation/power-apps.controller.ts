@@ -1,6 +1,9 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { ZodError } from 'zod';
-import { submitPowerAppUseCase } from '../application/submit-power-app.use-case.js';
+import { SupabasePipelineStageAdvancer } from '../../../core/pipeline/application/advance-stage.js';
+import { SupabasePipelineCaseRepository } from '../../../core/pipeline/infrastructure/supabase-pipeline-case.repository.js';
+import { getSupabaseClient } from '../../../infrastructure/database/supabase.js';
+import { submitPowerAppOrchestrator } from '../application/submit-power-app.orchestrator.js';
 import { submitPowerAppSchema } from '../application/dtos/submit-power-app.dto.js';
 import type { ValidationIssue } from '../domain/validation-issue.js';
 
@@ -13,7 +16,11 @@ function mapZodIssues(error: ZodError): ValidationIssue[] {
   }));
 }
 
-export function submitPowerAppHandler(req: Request, res: Response, next: NextFunction): void {
+export async function submitPowerAppHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const parsed = submitPowerAppSchema.safeParse(req.body);
 
@@ -29,7 +36,11 @@ export function submitPowerAppHandler(req: Request, res: Response, next: NextFun
       return;
     }
 
-    const result = submitPowerAppUseCase(parsed.data);
+    const supabase = getSupabaseClient();
+    const result = await submitPowerAppOrchestrator(parsed.data, {
+      cases: new SupabasePipelineCaseRepository(supabase),
+      pipeline: new SupabasePipelineStageAdvancer(supabase),
+    });
     const statusCode = result.valid ? 201 : 422;
 
     res.status(statusCode).json(result);

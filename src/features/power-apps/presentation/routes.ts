@@ -6,4 +6,6 @@ import { submitPowerAppHandler } from './power-apps.controller.js';
  */
 export const powerAppsRouter = Router();
 
-powerAppsRouter.post('/submit', submitPowerAppHandler);
+powerAppsRouter.post('/submit', (req, res, next) => {
+  submitPowerAppHandler(req, res, next).catch(next);
+});

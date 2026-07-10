@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import type { BuildClientesFinalesUseCase } from '../application/build-clientes-finales.use-case.js';
+import type { PipelineCaseRepository } from '../../../core/pipeline/domain/pipeline-case.repository.js';
 import type { ClientesFinalesRepository } from '../domain/repositories.js';
 
 const MAX_SEARCH_LENGTH = 100;
@@ -26,6 +27,7 @@ export class FileMatchingController {
     private readonly buildClientesFinales: BuildClientesFinalesUseCase,
     private readonly clientesFinalesRepository: ClientesFinalesRepository,
     private readonly clientesFinalesSinPagareRepository: ClientesFinalesRepository,
+    private readonly pipelineCases: PipelineCaseRepository,
   ) {}
 
   /** Ejecuta ambas validaciones del cruce; responde solo conteos (sin datos de clientes). */
@@ -74,6 +76,16 @@ export class FileMatchingController {
       return;
     }
 
-    res.json({ cliente });
+    let pipelineCase = null;
+    try {
+      pipelineCase = await this.pipelineCases.findByLeadId(clienteId);
+    } catch {
+      pipelineCase = null;
+    }
+
+    res.json({
+      cliente,
+      ...(pipelineCase ? { pipelineCase } : {}),
+    });
   }
 }

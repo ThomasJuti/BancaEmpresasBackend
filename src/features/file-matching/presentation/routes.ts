@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getSupabaseClient } from '../../../infrastructure/database/supabase.js';
+import { SupabasePipelineCaseRepository } from '../../../core/pipeline/infrastructure/supabase-pipeline-case.repository.js';
 import { BuildClientesFinalesUseCase } from '../application/build-clientes-finales.use-case.js';
 import { SupabaseBasePotencialRepository } from '../infrastructure/supabase-base-potencial.repository.js';
 import { SupabaseCecRepository } from '../infrastructure/supabase-cec.repository.js';
@@ -38,6 +39,7 @@ function getController(): FileMatchingController {
     buildClientesFinales,
     clientesFinalesRepository,
     clientesFinalesSinPagareRepository,
+    new SupabasePipelineCaseRepository(supabase),
   );
   return controller;
 }
@@ -51,9 +53,11 @@ fileMatchingRouter.get('/health', (_req, res) => {
 });
 
 fileMatchingRouter.post('/run', (req, res) => getController().run(req, res));
-fileMatchingRouter.get('/clientes-finales/:clienteId', (req, res) =>
-  getController().getClienteFinalById(req, res),
-);
+fileMatchingRouter.get('/clientes-finales/:clienteId', (req, res, next) => {
+  getController()
+    .getClienteFinalById(req, res)
+    .catch(next);
+});
 fileMatchingRouter.get('/clientes-finales', (req, res) =>
   getController().listClientesFinales(req, res),
 );
