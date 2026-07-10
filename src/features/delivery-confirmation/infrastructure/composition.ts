@@ -12,7 +12,20 @@ import {
 } from './supabase-repository.js';
 import { HmacConfirmationTokenService } from './token-service.js';
 import { NodemailerGmailEmailSender } from './nodemailer-gmail-email-sender.js';
+import { ResendDeliveryEmailSender } from './resend-email-sender.js';
 import { DemoShipmentScheduler } from './demo-shipment-scheduler.js';
+
+function createEmailSender(): DeliveryEmailSender {
+  if (env.gmail.user && env.gmail.appPassword) {
+    return new NodemailerGmailEmailSender(env.gmail.user, env.gmail.appPassword);
+  }
+  if (env.resend.apiKey && env.resend.fromEmail) {
+    return new ResendDeliveryEmailSender(env.resend.apiKey, env.resend.fromEmail);
+  }
+  throw new Error(
+    'Configure GMAIL_USER/GMAIL_APP_PASSWORD or RESEND_API_KEY/RESEND_FROM_EMAIL to send delivery confirmation emails',
+  );
+}
 
 export interface DeliveryConfirmationDeps {
   repository: DeliveryConfirmationRepository;
@@ -42,7 +55,7 @@ export function getDeliveryConfirmationDeps(): DeliveryConfirmationDeps {
     managers: new ClientesFinalesManagerDirectory(db),
     // DEMO: envío por SMTP de Gmail (App Password) para poder mandar a los
     // socios sin verificar dominio. Volver a ResendDeliveryEmailSender para prod.
-    emailSender: new NodemailerGmailEmailSender(env.gmail.user, env.gmail.appPassword),
+    emailSender: createEmailSender(),
     tokens: new HmacConfirmationTokenService(env.deliveryConfirmation.tokenSecret),
     pipeline: new SupabasePipelineStageAdvancer(db),
     dayMs: env.deliveryConfirmation.dayMs,

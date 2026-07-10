@@ -30,12 +30,17 @@ export class NodemailerGmailEmailSender implements DeliveryEmailSender {
   }
 
   async send(payload: DeliveryEmailPayload): Promise<string | undefined> {
-    const info = await this.transporter.sendMail({
-      from: this.user,
-      to: payload.to,
-      subject: buildDeliverySubject(payload.isRetry),
-      html: buildDeliveryHtml(payload),
-    });
-    return info.messageId;
+    try {
+      const info = await this.transporter.sendMail({
+        from: this.user,
+        to: payload.to,
+        subject: buildDeliverySubject(payload.isRetry),
+        html: buildDeliveryHtml(payload),
+      });
+      return info.messageId;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Gmail SMTP send to ${payload.to} failed: ${message}`);
+    }
   }
 }

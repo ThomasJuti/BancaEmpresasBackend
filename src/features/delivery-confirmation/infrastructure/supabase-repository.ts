@@ -10,6 +10,7 @@ import type {
   DeliveryEmailAttempt,
   NewDeliveryConfirmationCase,
 } from '../domain/types.js';
+import { normalizeLeadId } from '../../../core/pipeline/domain/normalize-lead-id.js';
 import { AppError } from '../../../shared/exceptions/app-error.js';
 
 const CASES_TABLE = 'delivery_confirmation_cases';
@@ -240,10 +241,11 @@ export class ClientesFinalesManagerDirectory implements ManagerDirectory {
   constructor(private readonly db: SupabaseClient) {}
 
   async findByCompanyId(companyId: string): Promise<CompanyManager[]> {
+    const normalizedCompanyId = normalizeLeadId(companyId);
     const { data: rows, error } = await this.db
       .from('clientes_finales')
       .select('nombre, correo')
-      .eq('cliente_id', companyId);
+      .eq('cliente_id', normalizedCompanyId);
 
     if (error) throw dbError('findByCompanyId(clientes_finales)', error);
 

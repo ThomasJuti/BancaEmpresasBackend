@@ -25,10 +25,12 @@ export async function processDueEmails(deps: ProcessDueEmailsDeps): Promise<numb
 
     if (managers.length === 0) {
       console.warn(
-        `delivery-confirmation: no managers found for company of case ${dueCase.id}, skipping`,
+        `delivery-confirmation: no managers found for company ${dueCase.companyId} (case ${dueCase.id}), skipping`,
       );
       continue;
     }
+
+    let sentCount = 0;
 
     for (const manager of managers) {
       const token = deps.tokens.generate(dueCase.id, manager.email);
@@ -50,13 +52,26 @@ export async function processDueEmails(deps: ProcessDueEmailsDeps): Promise<numb
           providerMessageId,
           tokenHash: deps.tokens.hash(token),
         });
+        sentCount += 1;
+        console.log(
+          `delivery-confirmation: email sent to ${manager.email} for case ${dueCase.id} (company ${dueCase.companyId})`,
+        );
       } catch (error) {
         // No abortamos el lote: otros gerentes/casos deben seguir procesándose.
-        console.error(`delivery-confirmation: failed to send email for case ${dueCase.id}`, error);
+        console.error(
+          `delivery-confirmation: failed to send email to ${manager.email} for case ${dueCase.id}`,
+          error,
+        );
       }
     }
 
-    await deps.repository.markSent(dueCase.id, new Date());
+    if (sentCount > 0) {
+      await deps.repository.markSent(dueCase.id, new Date());
+    } else {
+      console.error(
+        `delivery-confirmation: all email sends failed for case ${dueCase.id} (company ${dueCase.companyId}); case remains scheduled for retry`,
+      );
+    }
   }
 
   return dueCases.length;

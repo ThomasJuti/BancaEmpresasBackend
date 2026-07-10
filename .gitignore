@@ -19,3 +19,4 @@ supabase/.temp/
 # Herramientas de agentes locales
 .atl/
 .vercel
+.env*

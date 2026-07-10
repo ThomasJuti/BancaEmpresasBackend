@@ -1,3 +1,4 @@
+import { normalizeLeadId } from '../../../core/pipeline/domain/normalize-lead-id.js';
 import type { DeliveryConfirmationRepository } from '../domain/repository.js';
 import type { DeliveryConfirmationCase } from '../domain/types.js';
 import { ValidationError } from '../../../shared/exceptions/app-error.js';
@@ -39,7 +40,7 @@ export async function registerShipment(
   return deps.repository.create({
     caseId: input.caseId,
     cardId: input.cardId,
-    companyId: input.companyId,
+    companyId: normalizeLeadId(input.companyId),
     cardHolderName: input.cardHolderName,
     cardLastFour: input.cardLastFour,
     physicalShippedAt: shippedAt.toISOString(),
