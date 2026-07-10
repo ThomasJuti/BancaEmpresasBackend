@@ -77,6 +77,16 @@ create table if not exists clientes_finales (
   lea_aprobado numeric,
   correo text,
   telefono text,
+  -- Enriquecimiento RUES (Croma) — POST /api/file-matching/enrich-rues
+  representante_legal_nombre text,
+  representante_legal_documento text,
+  representante_legal_cargo text,
+  direccion_comercial text,
+  municipio_comercial text,
+  tipo_sociedad text,
+  actividad_economica text,
+  rues_found boolean,
+  rues_enriched_at timestamptz,
   creado_en timestamptz not null default now()
 );
 
@@ -90,6 +100,16 @@ create table if not exists clientes_finales_sin_pagare (
   lea_aprobado numeric,
   correo text,
   telefono text,
+  -- Enriquecimiento RUES (Croma) — POST /api/file-matching/enrich-rues
+  representante_legal_nombre text,
+  representante_legal_documento text,
+  representante_legal_cargo text,
+  direccion_comercial text,
+  municipio_comercial text,
+  tipo_sociedad text,
+  actividad_economica text,
+  rues_found boolean,
+  rues_enriched_at timestamptz,
   creado_en timestamptz not null default now()
 );
 

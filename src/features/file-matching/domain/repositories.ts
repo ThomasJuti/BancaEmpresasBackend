@@ -1,8 +1,14 @@
-import type { BasePotencialCliente, CecCliente, ClienteFinal } from './entities.js';
+import type { BasePotencialCliente, CecCliente, ClienteFinal, EmpresaRues } from './entities.js';
 
 /** Clientes CEC con cupo disponible para crédito (disponible > 0). */
 export interface CecRepository {
   findConCupoDisponible(): Promise<CecCliente[]>;
+}
+
+/** Consulta de datos de empresa en RUES (Croma) por NIT. */
+export interface RuesProvider {
+  /** Devuelve la empresa normalizada, o null si RUES no la encuentra. */
+  findByNit(nit: string): Promise<EmpresaRues | null>;
 }
 
 /**
@@ -42,4 +48,8 @@ export interface ClientesFinalesRepository {
   findAll(): Promise<ClienteFinal[]>;
   findPage(query: ClientesFinalesPageQuery): Promise<ClientesFinalesPageResult>;
   findByClienteId(clienteId: string): Promise<ClienteFinal | null>;
+  /** cliente_id de las filas aún sin enriquecer con RUES (rues_enriched_at is null). */
+  findClienteIdsSinEnriquecer(limit?: number): Promise<string[]>;
+  /** Guarda el enriquecimiento RUES de un cliente (empresa=null cuando no hubo coincidencia). */
+  updateRuesEnrichment(clienteId: string, empresa: EmpresaRues | null): Promise<void>;
 }

@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import type { BuildClientesFinalesUseCase } from '../application/build-clientes-finales.use-case.js';
+import type { EnrichClientesFinalesRuesUseCase } from '../application/enrich-clientes-finales-rues.use-case.js';
 import type { ClientesFinalesRepository } from '../domain/repositories.js';
 
 const MAX_SEARCH_LENGTH = 100;
@@ -26,11 +27,25 @@ export class FileMatchingController {
     private readonly buildClientesFinales: BuildClientesFinalesUseCase,
     private readonly clientesFinalesRepository: ClientesFinalesRepository,
     private readonly clientesFinalesSinPagareRepository: ClientesFinalesRepository,
+    private readonly enrichClientesFinalesRues: EnrichClientesFinalesRuesUseCase,
   ) {}
 
   /** Ejecuta ambas validaciones del cruce; responde solo conteos (sin datos de clientes). */
   async run(_req: Request, res: Response): Promise<void> {
     const resumen = await this.buildClientesFinales.execute();
+    res.json({ resumen });
+  }
+
+  /** Enriquece clientes_finales con RUES (Croma); responde solo conteos. */
+  async enrichRues(req: Request, res: Response): Promise<void> {
+    const body = (req.body ?? {}) as { soloFaltantes?: unknown; limit?: unknown };
+    const soloFaltantes = typeof body.soloFaltantes === 'boolean' ? body.soloFaltantes : undefined;
+    const limit =
+      typeof body.limit === 'number' && Number.isInteger(body.limit) && body.limit > 0
+        ? body.limit
+        : undefined;
+
+    const resumen = await this.enrichClientesFinalesRues.execute({ soloFaltantes, limit });
     res.json({ resumen });
   }
 

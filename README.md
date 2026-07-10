@@ -132,6 +132,17 @@ curl localhost:3000/api/file-matching/clientes-finales
 curl localhost:3000/api/file-matching/clientes-finales-sin-pagare
 ```
 
+### 4. Enriquecer con RUES (Croma)
+
+Paso intermedio que completa `clientes_finales` con datos del RUES por NIT (representante legal + datos de empresa para la Power App). Requiere `CROMA_API_KEY`. Como el cruce (`/run`) regenera la tabla y **borra** el enriquecimiento, el orden es siempre `run` → `enrich-rues`:
+
+```bash
+curl -X POST localhost:3000/api/file-matching/enrich-rues
+# opcional: {"soloFaltantes": true, "limit": 50}
+```
+
+Responde solo conteos: `{ procesados, encontrados, sinCoincidencia, errores }`. Campos que llena: `representante_legal_nombre/documento/cargo`, `direccion_comercial`, `municipio_comercial`, `tipo_sociedad`, `actividad_economica`, `rues_found`, `rues_enriched_at`. Es re-ejecutable (por defecto salta los ya enriquecidos).
+
 **Entrega física:** operaciones arma la carpeta y la entrega al gerente de relaciones; este entrega las tarjetas al gerente de la empresa solicitante.
 
 El bloque de entrega (`codigoOficinaCentroServicio`, `ciudadPuntoEntrega`, etc.) va en el mismo payload; no modela el tracking posterior de la carpeta.

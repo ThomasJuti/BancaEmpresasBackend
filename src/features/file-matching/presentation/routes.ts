@@ -1,10 +1,13 @@
 import { Router } from 'express';
+import { env } from '../../../infrastructure/config/env.js';
 import { getSupabaseClient } from '../../../infrastructure/database/supabase.js';
 import { BuildClientesFinalesUseCase } from '../application/build-clientes-finales.use-case.js';
+import { EnrichClientesFinalesRuesUseCase } from '../application/enrich-clientes-finales-rues.use-case.js';
 import { SupabaseBasePotencialRepository } from '../infrastructure/supabase-base-potencial.repository.js';
 import { SupabaseCecRepository } from '../infrastructure/supabase-cec.repository.js';
 import { SupabaseClientesFinalesRepository } from '../infrastructure/supabase-clientes-finales.repository.js';
 import { SupabasePagaresRepository } from '../infrastructure/supabase-pagares.repository.js';
+import { CromaRuesClient } from '../infrastructure/croma-rues.client.js';
 import { FileMatchingController } from './controller.js';
 
 /** Cruce de archivos: base potencial × CEC × pagarés → clientes_finales[_sin_pagare] */
@@ -34,10 +37,16 @@ function getController(): FileMatchingController {
     clientesFinalesSinPagareRepository,
   );
 
+  const enrichClientesFinalesRues = new EnrichClientesFinalesRuesUseCase(
+    clientesFinalesRepository,
+    new CromaRuesClient(env.croma.apiUrl, env.croma.apiKey),
+  );
+
   controller = new FileMatchingController(
     buildClientesFinales,
     clientesFinalesRepository,
     clientesFinalesSinPagareRepository,
+    enrichClientesFinalesRues,
   );
   return controller;
 }
@@ -51,6 +60,7 @@ fileMatchingRouter.get('/health', (_req, res) => {
 });
 
 fileMatchingRouter.post('/run', (req, res) => getController().run(req, res));
+fileMatchingRouter.post('/enrich-rues', (req, res) => getController().enrichRues(req, res));
 fileMatchingRouter.get('/clientes-finales/:clienteId', (req, res) =>
   getController().getClienteFinalById(req, res),
 );

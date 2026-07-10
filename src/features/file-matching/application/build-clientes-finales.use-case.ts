@@ -89,6 +89,16 @@ export class BuildClientesFinalesUseCase {
         leaAprobado: cec.leaAprobado,
         correo: cliente.correo,
         telefono: cliente.telefono,
+        // Enriquecimiento RUES: se llena aparte con POST /enrich-rues.
+        representanteLegalNombre: null,
+        representanteLegalDocumento: null,
+        representanteLegalCargo: null,
+        direccionComercial: null,
+        municipioComercial: null,
+        tipoSociedad: null,
+        actividadEconomica: null,
+        ruesFound: null,
+        ruesEnrichedAt: null,
       });
     }
 

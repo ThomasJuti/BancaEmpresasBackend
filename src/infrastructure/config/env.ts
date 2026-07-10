@@ -25,6 +25,8 @@ const envSchema = z.object({
   CALL_BATCH_BUSINESS_START_HOUR: z.coerce.number().int().min(0).max(23).default(8),
   CALL_BATCH_BUSINESS_END_HOUR: z.coerce.number().int().min(1).max(24).default(20),
   CALL_BATCH_TIMEZONE: z.string().default('America/Bogota'),
+  CROMA_API_URL: z.string().url().optional().or(z.literal('')).default('https://api.croma.run'),
+  CROMA_API_KEY: z.string().optional().default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -74,5 +76,9 @@ export const env = {
       endHour: data.CALL_BATCH_BUSINESS_END_HOUR,
     },
     timezone: data.CALL_BATCH_TIMEZONE,
+  },
+  croma: {
+    apiUrl: data.CROMA_API_URL || 'https://api.croma.run',
+    apiKey: data.CROMA_API_KEY,
   },
 } as const;
