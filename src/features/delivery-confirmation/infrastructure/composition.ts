@@ -5,12 +5,14 @@ import type { DeliveryConfirmationRepository, ManagerDirectory } from '../domain
 import type { DeliveryEmailSender } from '../domain/email-sender.js';
 import type { ConfirmationTokenService } from '../domain/token-service.js';
 import type { PipelineStageAdvancer } from '../../../shared/contracts/pipeline.js';
+import type { ShipmentScheduler } from '../../../shared/contracts/shipment-scheduler.js';
 import {
   SupabaseDeliveryConfirmationRepository,
   SupabaseManagerDirectory,
 } from './supabase-repository.js';
 import { HmacConfirmationTokenService } from './token-service.js';
 import { ResendDeliveryEmailSender } from './resend-email-sender.js';
+import { DemoShipmentScheduler } from './demo-shipment-scheduler.js';
 
 export interface DeliveryConfirmationDeps {
   repository: DeliveryConfirmationRepository;
@@ -44,4 +46,17 @@ export function getDeliveryConfirmationDeps(): DeliveryConfirmationDeps {
   };
 
   return deps;
+}
+
+/**
+ * Scheduler para que power-apps agende el correo al aprobar (demo). Solo
+ * necesita Supabase + dayMs; no exige Resend/token, que recién hacen falta
+ * cuando el cron efectivamente envía.
+ */
+export function getShipmentScheduler(): ShipmentScheduler {
+  const db = getSupabaseClient();
+  return new DemoShipmentScheduler(
+    new SupabaseDeliveryConfirmationRepository(db),
+    env.deliveryConfirmation.dayMs,
+  );
 }

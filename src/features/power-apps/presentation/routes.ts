@@ -1,20 +1,27 @@
 import { Router } from 'express';
-import { submitPowerAppHandler } from './power-apps.controller.js';
+import { createSubmitPowerAppHandler } from './power-apps.controller.js';
 import { consultarRuesHandler, ruesHealthHandler } from './rues.controller.js';
+import type { ShipmentScheduler } from '../../../shared/contracts/shipment-scheduler.js';
 
 /**
  * Simulador de Power App: comprobación de campos y decisión operativa.
+ * Recibe el ShipmentScheduler para agendar el correo al aprobar (demo).
  */
-export const powerAppsRouter = Router();
+export function createPowerAppsRouter(shipmentScheduler: ShipmentScheduler): Router {
+  const router = Router();
+  const submitPowerAppHandler = createSubmitPowerAppHandler(shipmentScheduler);
 
-powerAppsRouter.post('/submit', (req, res, next) => {
-  submitPowerAppHandler(req, res, next).catch(next);
-});
+  router.post('/submit', (req, res, next) => {
+    submitPowerAppHandler(req, res, next).catch(next);
+  });
 
-powerAppsRouter.get('/rues/health', (req, res, next) => {
-  ruesHealthHandler(req, res, next).catch(next);
-});
+  router.get('/rues/health', (req, res, next) => {
+    ruesHealthHandler(req, res, next).catch(next);
+  });
 
-powerAppsRouter.post('/rues/consultar', (req, res, next) => {
-  consultarRuesHandler(req, res, next).catch(next);
-});
+  router.post('/rues/consultar', (req, res, next) => {
+    consultarRuesHandler(req, res, next).catch(next);
+  });
+
+  return router;
+}

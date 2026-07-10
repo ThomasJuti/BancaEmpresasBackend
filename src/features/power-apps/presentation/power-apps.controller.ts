@@ -6,6 +6,7 @@ import { getSupabaseClient } from '../../../infrastructure/database/supabase.js'
 import { submitPowerAppOrchestrator } from '../application/submit-power-app.orchestrator.js';
 import { submitPowerAppSchema } from '../application/dtos/submit-power-app.dto.js';
 import type { ValidationIssue } from '../domain/validation-issue.js';
+import type { ShipmentScheduler } from '../../../shared/contracts/shipment-scheduler.js';
 
 function mapZodIssues(error: ZodError): ValidationIssue[] {
   return error.issues.map((issue) => ({
@@ -16,35 +17,43 @@ function mapZodIssues(error: ZodError): ValidationIssue[] {
   }));
 }
 
-export async function submitPowerAppHandler(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
-    const parsed = submitPowerAppSchema.safeParse(req.body);
+/**
+ * Factory del handler de submit. Recibe el ShipmentScheduler inyectado desde
+ * el composition root (src/routes.ts) para no acoplar power-apps a internals
+ * de delivery-confirmation; las deps de core/pipeline sí se arman inline.
+ */
+export function createSubmitPowerAppHandler(shipmentScheduler: ShipmentScheduler) {
+  return async function submitPowerAppHandler(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const parsed = submitPowerAppSchema.safeParse(req.body);
 
-    if (!parsed.success) {
-      res.status(400).json({
-        decision: 'RECHAZADO',
-        valid: false,
-        radicado: null,
-        issues: mapZodIssues(parsed.error),
-        summary: 'La solicitud no cumple el formato esperado de la Power App.',
-        siguientePaso: 'Revise los campos obligatorios y el formato de la solicitud.',
+      if (!parsed.success) {
+        res.status(400).json({
+          decision: 'RECHAZADO',
+          valid: false,
+          radicado: null,
+          issues: mapZodIssues(parsed.error),
+          summary: 'La solicitud no cumple el formato esperado de la Power App.',
+          siguientePaso: 'Revise los campos obligatorios y el formato de la solicitud.',
+        });
+        return;
+      }
+
+      const supabase = getSupabaseClient();
+      const result = await submitPowerAppOrchestrator(parsed.data, {
+        cases: new SupabasePipelineCaseRepository(supabase),
+        pipeline: new SupabasePipelineStageAdvancer(supabase),
+        shipmentScheduler,
       });
-      return;
+      const statusCode = result.valid ? 201 : 422;
+
+      res.status(statusCode).json(result);
+    } catch (error) {
+      next(error);
     }
-
-    const supabase = getSupabaseClient();
-    const result = await submitPowerAppOrchestrator(parsed.data, {
-      cases: new SupabasePipelineCaseRepository(supabase),
-      pipeline: new SupabasePipelineStageAdvancer(supabase),
-    });
-    const statusCode = result.valid ? 201 : 422;
-
-    res.status(statusCode).json(result);
-  } catch (error) {
-    next(error);
-  }
+  };
 }
