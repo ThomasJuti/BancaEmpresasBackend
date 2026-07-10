@@ -204,3 +204,26 @@ alter table pipeline_cases enable row level security;
 alter table company_managers enable row level security;
 alter table delivery_confirmation_cases enable row level security;
 alter table delivery_confirmation_emails enable row level security;
+
+-- ── activation-follow-up (seguimiento de uso de TC) ──────────────────────────
+
+create table if not exists follow_up_cases (
+  id uuid primary key default gen_random_uuid(),
+  cliente_id text not null unique,
+  case_id uuid references pipeline_cases (id),
+  cliente_nombre text,
+  telefono text,
+  correo text,
+  delivered_at timestamptz not null default now(),
+  congratulated_at timestamptz,
+  congratulation_call_id text,
+  last_used_at timestamptz not null default now(),
+  last_reminder_at timestamptz,
+  reminder_count integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_follow_up_cases_last_used on follow_up_cases (last_used_at);
+
+alter table follow_up_cases enable row level security;

@@ -1,6 +1,11 @@
 import { SupabasePipelineStageAdvancer } from '../../../core/pipeline/application/advance-stage.js';
 import { env } from '../../../infrastructure/config/env.js';
 import { getSupabaseClient } from '../../../infrastructure/database/supabase.js';
+import type {
+  FollowUpCallInput,
+  FollowUpCallResult,
+  FollowUpCallService,
+} from '../../../shared/contracts/follow-up-call.js';
 import { BuildPowerAppPrefillUseCase } from '../application/BuildPowerAppPrefillUseCase.js';
 import { CreateCallBatchUseCase } from '../application/CreateCallBatchUseCase.js';
 import { DispatchCallBatchesUseCase } from '../application/DispatchCallBatchesUseCase.js';
@@ -88,4 +93,57 @@ export function getSalesCallsDeps(): SalesCallsDeps {
   };
 
   return deps;
+}
+
+/**
+ * Implementación del contrato FollowUpCallService (shared/contracts) para que
+ * activation-follow-up dispare llamadas del agente de seguimiento sin importar
+ * internals de esta feature. Usa FONEMA_FOLLOWUP_AGENT_ID (agente distinto al
+ * de ventas) y persiste en la misma tabla `calls` (visible en /llamadas y
+ * cerrada por los mismos webhooks). Construcción perezosa: valida config en la
+ * primera llamada, no al arrancar.
+ */
+class FonemaFollowUpCallService implements FollowUpCallService {
+  private initiateCall: InitiateCallUseCase | null = null;
+
+  async initiate(input: FollowUpCallInput): Promise<FollowUpCallResult> {
+    const call = await this.getUseCase().execute({
+      phoneNumber: input.phoneNumber,
+      customerName: input.customerName,
+      caseId: input.caseId,
+      variables: {
+        ...input.variables,
+        tipo_llamada: input.tipo,
+        nit: input.nit,
+      },
+    });
+    return { callId: call.id };
+  }
+
+  private getUseCase(): InitiateCallUseCase {
+    if (this.initiateCall) return this.initiateCall;
+
+    if (!env.fonema.apiUrl || !env.fonema.apiKey || !env.fonema.followUpAgentId) {
+      throw new Error(
+        'Agente de seguimiento Fonema no configurado. Set FONEMA_API_URL, FONEMA_API_KEY y FONEMA_FOLLOWUP_AGENT_ID.',
+      );
+    }
+
+    this.initiateCall = new InitiateCallUseCase(
+      new FonemaHttpGateway(env.fonema.apiUrl, env.fonema.apiKey),
+      new SupabaseCallRepository(getSupabaseClient()),
+      env.fonema.followUpAgentId,
+    );
+    return this.initiateCall;
+  }
+}
+
+let followUpCallService: FollowUpCallService | null = null;
+
+/** Punto de acceso para el composition root (src/routes.ts). */
+export function getFollowUpCallService(): FollowUpCallService {
+  if (!followUpCallService) {
+    followUpCallService = new FonemaFollowUpCallService();
+  }
+  return followUpCallService;
 }

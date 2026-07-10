@@ -204,6 +204,15 @@ Tras cerrar la venta telefónica se diligencia la Power App. El simulador expone
 
 Estos campos registran lo acordado al radicar; la cadena operativa posterior (carpeta → gerente de relaciones → gerente de empresa) ocurre fuera del submit.
 
+### Activation Follow-up (seguimiento de uso de la TC — Fonema)
+
+Última etapa del pipeline. La TC se **inactiva a los 90 días sin uso**; esta feature monitorea el uso y llama con un **agente Fonema de seguimiento** (`FONEMA_FOLLOWUP_AGENT_ID`; prompt en `docs/fonema-agente-seguimiento.md`, variable `tipo_llamada` distingue los dos modos).
+
+- **Disparador 1 — felicitación**: la primera vez que se marca el check "entrega de la TC finalizada" (punto 5 del portafolio en el front) → `POST /api/activation-follow-up/cases` crea el caso (idempotente por `cliente_id`), dispara la llamada `felicitacion` (best-effort) y avanza el pipeline a `activation_follow_up`.
+- **Disparador 2 — recordatorio por inactividad**: cron `GET|POST /api/activation-follow-up/cron/process-reminders` (Vercel Cron; en local scheduler cada 5 s). Cadencia (`domain/follow-up-policy.ts`, días emulados con `TIME_COMPRESSION_DAY_MS`): mes 1 (día 30–59) **una** llamada por ciclo de uso; mes 2 (60–89) cada 15 días (riesgo desde el 75); mes 3 (≥90) semanal hasta uso o cancelación. Registrar uso reinicia el ciclo.
+- **Uso de la tarjeta (demo)**: `POST /api/activation-follow-up/cases/{clienteId}/usage` simula la transacción (en producción vendría de sistemas del banco). `GET /cases` alimenta la vista lateral "Seguimiento" del front (días sin uso, fase, próxima llamada estimada).
+- **Acoplamiento**: contrato `shared/contracts/follow-up-call.ts` (`FollowUpCallService`), implementado por sales-calls (`getFollowUpCallService()`) e inyectado desde `src/routes.ts` — las llamadas quedan en la tabla `calls` (mismos webhooks; visibles en /llamadas). Persistencia propia en `follow_up_cases` (migración `009_activation_follow_up.sql`).
+
 ### Agendamiento y ANS (referencia operativa)
 
 - Bogotá: ~3 días hábiles; ciudades principales: 5–7 días hábiles; solo lunes a viernes.
@@ -222,6 +231,7 @@ Persistencia en Postgres/Supabase (proyecto `banca-empresas-backend`, ref `eewlf
 | `001_delivery_confirmation` | `pipeline_cases`, `company_managers`, `delivery_confirmation_cases`, `delivery_confirmation_emails` | Espina del pipeline + confirmación de entrega |
 | `002_rls_delivery_confirmation` | (policies) | RLS de las tablas de pipeline/delivery |
 | `003_call_campaigns` | `calls`, `call_batches`, `call_batch_items` | Llamadas Fonema durables + campañas (batch calling) |
+| `009_activation_follow_up` | `follow_up_cases` | Seguimiento de uso de la TC entregada (felicitación + recordatorios por inactividad) |
 
 ### La espina: `pipeline_cases`
 

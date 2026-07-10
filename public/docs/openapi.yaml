@@ -74,6 +74,8 @@ tags:
     description: Simulador de solicitud TC LATAM Business
   - name: Sales Calls
     description: Llamadas de venta agénticas vía Fonema.ia y webhooks de resultado
+  - name: Activation Follow-up
+    description: Seguimiento de uso de la TC entregada — llamada de felicitación al finalizar la entrega y recordatorios por inactividad (la TC se inactiva a los 90 días sin uso)
 
 paths:
   /health:
@@ -647,6 +649,135 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DispatchResult'
+        '401':
+          description: Secret de cron inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/activation-follow-up/cases:
+    get:
+      tags: [Activation Follow-up]
+      summary: Listar casos de seguimiento de uso
+      description: |
+        Casos de tarjetas entregadas con campos calculados: días sin uso, fase
+        (`al_dia` <30 / `mes_1` 30-59 / `mes_2` 60-89 / `mes_3` ≥90), riesgo de
+        inactivación (≥75 días) y próxima llamada estimada.
+      operationId: listFollowUpCases
+      responses:
+        '200':
+          description: Lista de casos de seguimiento
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total, casos]
+                properties:
+                  total:
+                    type: integer
+                  casos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FollowUpCase'
+    post:
+      tags: [Activation Follow-up]
+      summary: Marcar entrega de la TC finalizada (check del punto 5 del portafolio)
+      description: |
+        Idempotente por cliente. La PRIMERA vez crea el caso de seguimiento,
+        dispara la llamada de felicitación (agente Fonema de seguimiento,
+        `tipo_llamada=felicitacion`) y avanza el pipeline a `activation_follow_up`.
+        Las siguientes veces devuelve el caso existente sin re-llamar.
+      operationId: finalizeDelivery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinalizeDeliveryRequest'
+            example:
+              clienteId: '9001234567'
+              nombre: 'EMPRESA DEMO S.A.S'
+              telefono: '3005551234'
+              correo: 'contacto@empresademo.example'
+      responses:
+        '201':
+          description: Caso creado (primera vez); indica si la felicitación se inició
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinalizeDeliveryResponse'
+        '200':
+          description: El caso ya existía (re-check); no se vuelve a llamar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinalizeDeliveryResponse'
+        '400':
+          description: Payload inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/activation-follow-up/cases/{clienteId}/usage:
+    post:
+      tags: [Activation Follow-up]
+      summary: Registrar uso de la tarjeta (demo)
+      description: |
+        Simula una transacción: reinicia el reloj de inactividad y el ciclo de
+        recordatorios. En producción este dato vendría de los sistemas
+        transaccionales del banco.
+      operationId: registerCardUsage
+      parameters:
+        - name: clienteId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4,15}$'
+      responses:
+        '200':
+          description: Caso actualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [caso]
+                properties:
+                  caso:
+                    $ref: '#/components/schemas/FollowUpCase'
+        '404':
+          description: Caso de seguimiento no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/activation-follow-up/cron/process-reminders:
+    post:
+      tags: [Activation Follow-up]
+      summary: Tick de recordatorios por inactividad (invocado por Vercel Cron)
+      description: |
+        Revisa la cadencia de cada caso y dispara las llamadas de recordatorio
+        vencidas (`tipo_llamada=recordatorio_uso`): mes 1 (día 30) una llamada,
+        mes 2 (60-89) cada 15 días, mes 3 (≥90) semanal. Protegido con
+        `Authorization: Bearer $CRON_SECRET`. Existe variante `GET` para pruebas.
+        En local lo reemplaza un scheduler cada 5 s.
+      operationId: processUsageReminders
+      security:
+        - cronSecret: []
+      responses:
+        '200':
+          description: Resumen del tick (solo conteos)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [resumen]
+                properties:
+                  resumen:
+                    $ref: '#/components/schemas/FollowUpRemindersResumen'
         '401':
           description: Secret de cron inválido
           content:
@@ -1428,6 +1559,74 @@ components:
             resumen: { type: string }
             grabacionUrl: { type: string }
             finalizadaEn: { type: string, format: date-time }
+
+    FinalizeDeliveryRequest:
+      type: object
+      required: [clienteId]
+      properties:
+        clienteId:
+          type: string
+          pattern: '^\d{4,15}$'
+          description: NIT de la empresa (lead del pipeline)
+          example: '9001234567'
+        nombre:
+          type: string
+          maxLength: 160
+          example: 'EMPRESA DEMO S.A.S'
+        telefono:
+          type: string
+          description: Teléfono de contacto (se normaliza a E.164 +57...)
+          example: '3005551234'
+        correo:
+          type: string
+          format: email
+          example: 'contacto@empresademo.example'
+
+    FinalizeDeliveryResponse:
+      type: object
+      required: [caso, llamadaFelicitacionIniciada, yaExistia]
+      properties:
+        caso:
+          $ref: '#/components/schemas/FollowUpCase'
+        llamadaFelicitacionIniciada:
+          type: boolean
+          description: true solo la primera vez, si la llamada Fonema se pudo iniciar
+        yaExistia:
+          type: boolean
+
+    FollowUpCase:
+      type: object
+      description: Caso de seguimiento de uso de una TC entregada, con campos calculados
+      required: [id, clienteId, deliveredAt, lastUsedAt, reminderCount, diasSinUso, fase]
+      properties:
+        id: { type: string, format: uuid }
+        clienteId: { type: string, example: '9001234567' }
+        caseId: { type: string, format: uuid, nullable: true }
+        clienteNombre: { type: string, nullable: true, example: 'EMPRESA DEMO S.A.S' }
+        telefono: { type: string, nullable: true, example: '3005551234' }
+        correo: { type: string, nullable: true, example: 'contacto@empresademo.example' }
+        deliveredAt: { type: string, format: date-time }
+        congratulatedAt: { type: string, format: date-time, nullable: true }
+        congratulationCallId: { type: string, nullable: true }
+        lastUsedAt: { type: string, format: date-time }
+        lastReminderAt: { type: string, format: date-time, nullable: true }
+        reminderCount: { type: integer, example: 1 }
+        diasSinUso: { type: integer, example: 34 }
+        fase:
+          type: string
+          enum: [al_dia, mes_1, mes_2, mes_3]
+          description: al_dia <30 días / mes_1 30-59 / mes_2 60-89 / mes_3 ≥90 (inactivación)
+        riesgoInactivacion: { type: boolean, description: 'true desde el día 75' }
+        diasParaInactivacion: { type: integer, example: 56 }
+        proximaLlamadaEstimada: { type: string, format: date-time, nullable: true }
+
+    FollowUpRemindersResumen:
+      type: object
+      required: [procesados, llamadasIniciadas, errores]
+      properties:
+        procesados: { type: integer, example: 2 }
+        llamadasIniciadas: { type: integer, example: 2 }
+        errores: { type: integer, example: 0 }
 
   parameters:
     BatchId:
