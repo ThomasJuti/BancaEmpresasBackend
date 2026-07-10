@@ -1,4 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import {
+  crossCheckPowerAppWithRues,
+  manualPdfWithoutRuesIssue,
+} from '../domain/rues-cross-check.js';
 import type { PowerAppRequest } from '../domain/power-app-request.js';
 import { validatePowerAppRequest } from '../domain/power-app-validator.js';
 import type { PowerAppDecision, ValidationIssue } from '../domain/validation-issue.js';
@@ -51,7 +55,7 @@ function buildSummary(decision: PowerAppDecision, errorCount: number, warningCou
 
 export function submitPowerAppUseCase(dto: SubmitPowerAppDto): SubmitPowerAppResult {
   const request = mapDtoToRequest(dto);
-  const issues = validatePowerAppRequest(request);
+  const issues = [...validatePowerAppRequest(request), ...collectRuesIssues(dto)];
   const decision = resolveDecision(issues);
   const errorCount = issues.filter((i) => i.severity === 'error').length;
   const warningCount = issues.filter((i) => i.severity === 'warning').length;
@@ -71,4 +75,39 @@ export function submitPowerAppUseCase(dto: SubmitPowerAppDto): SubmitPowerAppRes
         : 'Revise los errores reportados antes de reintentar.',
     submittedAt: new Date().toISOString(),
   };
+}
+
+function collectRuesIssues(dto: SubmitPowerAppDto): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  if (dto.documentoOrigen === 'MANUAL' || !dto.ruesSolicitudId) {
+    issues.push(manualPdfWithoutRuesIssue());
+  }
+
+  if (dto.ruesConsultation) {
+    issues.push(
+      ...crossCheckPowerAppWithRues(
+        {
+          identificacionEmpresa: dto.identificacionEmpresa,
+          nombreEmpresa: dto.nombreEmpresa,
+          numeroIdentificacionTarjetahabiente: dto.numeroIdentificacionTarjetahabiente,
+          nombreTarjetahabiente: dto.nombreTarjetahabiente,
+          ciudadPuntoEntrega: dto.ciudadPuntoEntrega,
+        },
+        {
+          solicitudId: dto.ruesConsultation.solicitudId,
+          nit: dto.ruesConsultation.nit,
+          consultadoEn: dto.ruesConsultation.consultadoEn,
+          urlConsulta: dto.ruesConsultation.urlConsulta,
+          razonSocial: dto.ruesConsultation.razonSocial,
+          datos: dto.ruesConsultation.datos,
+          secciones: dto.ruesConsultation.secciones ?? {},
+          representantes: dto.ruesConsultation.representantes ?? [],
+          actividades: dto.ruesConsultation.actividades ?? [],
+        },
+      ),
+    );
+  }
+
+  return issues;
 }

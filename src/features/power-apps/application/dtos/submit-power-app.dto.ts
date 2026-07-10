@@ -37,6 +37,30 @@ export const submitPowerAppSchema = z.object({
     .trim()
     .min(1, 'La dirección del punto comercial es obligatoria'),
   puntoEntrega: z.enum(['PUNTO_ENTREGA_A_COMERCIAL', 'ENVIO_CERTIFICADO_COURIER']),
+
+  ruesSolicitudId: z.string().trim().min(1).optional(),
+  ruesConsultadoEn: z.string().trim().min(1).optional(),
+  documentoOrigen: z.enum(['RUES', 'MANUAL']).optional(),
+  ruesConsultation: z
+    .object({
+      solicitudId: z.string().trim().min(1),
+      nit: z.string().trim().min(1),
+      consultadoEn: z.string().trim().min(1),
+      urlConsulta: z.string().trim().min(1),
+      razonSocial: z.string().trim().min(1),
+      datos: z.record(z.string(), z.string()),
+      secciones: z.record(z.string(), z.record(z.string(), z.string())).optional(),
+      representantes: z
+        .array(
+          z.object({
+            documento: z.string(),
+            nombre: z.string(),
+          }),
+        )
+        .optional(),
+      actividades: z.array(z.string()).optional(),
+    })
+    .optional(),
 });
 
 export type SubmitPowerAppDto = z.infer<typeof submitPowerAppSchema>;

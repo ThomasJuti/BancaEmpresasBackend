@@ -28,6 +28,41 @@ export class SupabasePipelineCaseRepository implements PipelineCaseRepository {
     return null;
   }
 
+  async findByLeadIds(leadIds: string[]): Promise<Map<string, PipelineCaseRecord>> {
+    const lookupKeys = new Set<string>();
+    for (const leadId of leadIds) {
+      const trimmed = leadId.trim();
+      if (trimmed) {
+        lookupKeys.add(trimmed);
+        lookupKeys.add(normalizeLeadId(trimmed));
+      }
+    }
+
+    if (lookupKeys.size === 0) {
+      return new Map();
+    }
+
+    const { data, error } = await this.db
+      .from('pipeline_cases')
+      .select('id, lead_id, stage, created_at, updated_at')
+      .in('lead_id', [...lookupKeys])
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      throw new AppError(`Error consultando pipeline_cases: ${error.message}`, 502, 'DATABASE_ERROR');
+    }
+
+    const result = new Map<string, PipelineCaseRecord>();
+    for (const row of (data ?? []) as PipelineCaseRow[]) {
+      const record = this.toRecord(row);
+      if (!result.has(record.leadId)) {
+        result.set(record.leadId, record);
+      }
+    }
+
+    return result;
+  }
+
   async ensureByLeadId(leadId: string): Promise<PipelineCaseRecord> {
     const existing = await this.findByLeadId(leadId);
     if (existing) {

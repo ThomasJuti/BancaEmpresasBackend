@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { BuildClientesFinalesUseCase } from '../application/build-clientes-finales.use-case.js';
 import type { EnrichClientesFinalesRuesUseCase } from '../application/enrich-clientes-finales-rues.use-case.js';
 import type { PipelineCaseRepository } from '../../../core/pipeline/domain/pipeline-case.repository.js';
+import { normalizeLeadId } from '../../../core/pipeline/domain/normalize-lead-id.js';
 import type { ClientesFinalesRepository } from '../domain/repositories.js';
 
 const MAX_SEARCH_LENGTH = 100;
@@ -55,7 +56,19 @@ export class FileMatchingController {
     const pagination = parsePagination(req);
     if (pagination) {
       const result = await this.clientesFinalesRepository.findPage(pagination);
-      res.json(result);
+      const pipelineCases = await this.pipelineCases
+        .findByLeadIds(result.clientes.map((cliente) => cliente.clienteId))
+        .catch(() => new Map());
+
+      const clientes = result.clientes.map((cliente) => ({
+        ...cliente,
+        pipelineCase:
+          pipelineCases.get(cliente.clienteId) ??
+          pipelineCases.get(normalizeLeadId(cliente.clienteId)) ??
+          null,
+      }));
+
+      res.json({ ...result, clientes });
       return;
     }
 

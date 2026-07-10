@@ -10,5 +10,6 @@ export interface PipelineCaseRecord {
 
 export interface PipelineCaseRepository {
   findByLeadId(leadId: string): Promise<PipelineCaseRecord | null>;
+  findByLeadIds(leadIds: string[]): Promise<Map<string, PipelineCaseRecord>>;
   ensureByLeadId(leadId: string): Promise<PipelineCaseRecord>;
 }

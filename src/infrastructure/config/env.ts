@@ -27,6 +27,16 @@ const envSchema = z.object({
   CALL_BATCH_TIMEZONE: z.string().default('America/Bogota'),
   CROMA_API_URL: z.string().url().optional().or(z.literal('')).default('https://api.croma.run'),
   CROMA_API_KEY: z.string().optional().default(''),
+  RUES_SERVICE_URL: z.string().url().optional().or(z.literal('')).default('http://localhost:8765'),
+  RUES_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  RUES_MOCK_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  RUES_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(240_000),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -80,5 +90,11 @@ export const env = {
   croma: {
     apiUrl: data.CROMA_API_URL || 'https://api.croma.run',
     apiKey: data.CROMA_API_KEY,
+  },
+  rues: {
+    serviceUrl: data.RUES_SERVICE_URL || 'http://localhost:8765',
+    enabled: data.RUES_ENABLED,
+    mockEnabled: data.RUES_MOCK_ENABLED,
+    requestTimeoutMs: data.RUES_REQUEST_TIMEOUT_MS,
   },
 } as const;
