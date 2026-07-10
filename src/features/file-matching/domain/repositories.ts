@@ -23,8 +23,23 @@ export interface PagaresRepository {
  * Persistencia de una lista resultado del cruce. Cada instancia apunta a una
  * tabla concreta (clientes_finales o clientes_finales_sin_pagare).
  */
+export interface ClientesFinalesPageQuery {
+  page: number;
+  limit: number;
+  search?: string;
+}
+
+export interface ClientesFinalesPageResult {
+  total: number;
+  page: number;
+  pageSize: number;
+  clientes: ClienteFinal[];
+}
+
 export interface ClientesFinalesRepository {
   /** Regenera la tabla completa: es una lista derivada, cada corrida la reemplaza. */
   replaceAll(clientes: ClienteFinal[]): Promise<void>;
   findAll(): Promise<ClienteFinal[]>;
+  findPage(query: ClientesFinalesPageQuery): Promise<ClientesFinalesPageResult>;
+  findByClienteId(clienteId: string): Promise<ClienteFinal | null>;
 }

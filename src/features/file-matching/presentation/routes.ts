@@ -51,6 +51,9 @@ fileMatchingRouter.get('/health', (_req, res) => {
 });
 
 fileMatchingRouter.post('/run', (req, res) => getController().run(req, res));
+fileMatchingRouter.get('/clientes-finales/:clienteId', (req, res) =>
+  getController().getClienteFinalById(req, res),
+);
 fileMatchingRouter.get('/clientes-finales', (req, res) =>
   getController().listClientesFinales(req, res),
 );
