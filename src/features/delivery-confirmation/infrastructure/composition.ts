@@ -8,7 +8,7 @@ import type { PipelineStageAdvancer } from '../../../shared/contracts/pipeline.j
 import type { ShipmentScheduler } from '../../../shared/contracts/shipment-scheduler.js';
 import {
   SupabaseDeliveryConfirmationRepository,
-  SupabaseManagerDirectory,
+  ClientesFinalesManagerDirectory,
 } from './supabase-repository.js';
 import { HmacConfirmationTokenService } from './token-service.js';
 import { ResendDeliveryEmailSender } from './resend-email-sender.js';
@@ -37,7 +37,9 @@ export function getDeliveryConfirmationDeps(): DeliveryConfirmationDeps {
 
   deps = {
     repository: new SupabaseDeliveryConfirmationRepository(db),
-    managers: new SupabaseManagerDirectory(db),
+    // DEMO: destinatario tomado de clientes_finales.correo en vez de
+    // company_managers. Volver a SupabaseManagerDirectory para producción.
+    managers: new ClientesFinalesManagerDirectory(db),
     emailSender: new ResendDeliveryEmailSender(env.resend.apiKey, env.resend.fromEmail),
     tokens: new HmacConfirmationTokenService(env.deliveryConfirmation.tokenSecret),
     pipeline: new SupabasePipelineStageAdvancer(db),

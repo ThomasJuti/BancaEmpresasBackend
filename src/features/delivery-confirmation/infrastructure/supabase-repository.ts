@@ -228,3 +228,30 @@ export class SupabaseManagerDirectory implements ManagerDirectory {
     return (rows ?? []) as CompanyManager[];
   }
 }
+
+/**
+ * ATAJO DE DEMO — no es la lógica correcta. El destinatario del correo debería
+ * ser el gerente de la empresa (company_managers), no el contacto del lead.
+ * Para la demo tomamos el correo directamente de clientes_finales (columna
+ * `correo`), cruzando por el NIT (`cliente_id` = companyId). Reemplazar por
+ * SupabaseManagerDirectory cuando company_managers esté poblado.
+ */
+export class ClientesFinalesManagerDirectory implements ManagerDirectory {
+  constructor(private readonly db: SupabaseClient) {}
+
+  async findByCompanyId(companyId: string): Promise<CompanyManager[]> {
+    const { data: rows, error } = await this.db
+      .from('clientes_finales')
+      .select('nombre, correo')
+      .eq('cliente_id', companyId);
+
+    if (error) throw dbError('findByCompanyId(clientes_finales)', error);
+
+    return (rows ?? [])
+      .filter((row) => typeof row.correo === 'string' && row.correo.trim() !== '')
+      .map((row) => ({
+        name: (row.nombre as string | null) ?? 'Contacto',
+        email: (row.correo as string).trim(),
+      }));
+  }
+}
