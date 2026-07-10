@@ -33,4 +33,11 @@ export class InMemoryCallRepository implements CallRepository {
     }
     return null;
   }
+
+  async findLatestByPhoneNumber(phoneNumber: string): Promise<Call | null> {
+    const matches = [...this.calls.values()]
+      .filter((call) => call.phoneNumber === phoneNumber)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return matches[0] ?? null;
+  }
 }

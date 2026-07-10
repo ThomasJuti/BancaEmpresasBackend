@@ -962,9 +962,20 @@ components:
           type: object
           additionalProperties:
             type: string
+          description: Variables de ENTRADA enviadas al agente al iniciar la llamada
           example:
             empresa: Empresa Demo SAS
             nit: '9001234567'
+        outputVariables:
+          type: object
+          additionalProperties:
+            type: string
+          description: >-
+            Variables de SALIDA que Fonema devuelve tras la conversación
+            (lo que el agente recolectó/actualizó). Se acumulan entre webhooks.
+          example:
+            cargo_solicitante: Gerente Financiero
+            mejor_horario_contacto: mañana
         status:
           type: string
           enum: [queued, initiated, in_progress, completed, failed]
@@ -984,9 +995,17 @@ components:
         endedReason:
           type: string
           example: customer-ended-call
+        startedAt:
+          type: string
+          format: date-time
+          description: Inicio real de la llamada según Fonema
         durationSeconds:
           type: integer
           example: 156
+        totalAttempts:
+          type: integer
+          description: Intentos de contacto de la sesión (llega en fin-de-sesión)
+          example: 2
         successEvaluation:
           oneOf:
             - type: boolean
@@ -996,7 +1015,7 @@ components:
         structuredData:
           type: object
           additionalProperties: true
-          description: Variables de salida del agente
+          description: Datos estructurados del análisis del agente (extracción/evaluación)
           example:
             identidad_verificada: Verdadero
             cliente_interesado: Verdadero
@@ -1344,15 +1363,18 @@ components:
     PowerAppPrefill:
       type: object
       description: |
-        Handoff de una llamada calificada hacia la Power App. Subconjunto **parcial**
-        de `PowerAppSubmitRequest` con lo conocido desde la llamada; el asesor completa
-        el resto (`archivosAdjuntos` con PDF Cámara de Comercio, datos de entrega, etc.).
+        Handoff de una llamada calificada hacia la Power App. Campos de
+        `PowerAppSubmitRequest` pre-poblados desde la llamada (entrada + variables
+        de salida + análisis del agente). El asesor completa lo no derivable —
+        sobre todo `archivosAdjuntos` (PDF Cámara de Comercio).
       required: [origenLlamada]
       properties:
         leadId:
           type: string
           example: lead-demo-001
         campana:
+          type: string
+        asesorId:
           type: string
         segmento:
           type: string
@@ -1387,6 +1409,16 @@ components:
           type: number
         cupoDisponibleCec:
           type: number
+        codigoOficinaCentroServicio:
+          type: string
+          description: Entrega; se pre-pobla si el agente la acordó en la llamada.
+        ciudadPuntoEntrega:
+          type: string
+        direccionPuntoComercial:
+          type: string
+        puntoEntrega:
+          type: string
+          enum: [PUNTO_ENTREGA_A_COMERCIAL, ENVIO_CERTIFICADO_COURIER]
         origenLlamada:
           type: object
           required: [callId]

@@ -16,12 +16,14 @@ interface CallRow {
   customer_email: string | null;
   script: string | null;
   variables: Record<string, string> | null;
+  output_variables: Record<string, string> | null;
   status: CallStatus;
   recording_url: string | null;
   details_url: string | null;
   transcript: TranscriptMessage[] | null;
   summary: string | null;
   ended_reason: string | null;
+  started_at: string | null;
   duration_seconds: number | null;
   success_evaluation: string | null;
   structured_data: Record<string, unknown> | null;
@@ -43,12 +45,14 @@ function toDomain(row: CallRow): Call {
     customerEmail: row.customer_email ?? undefined,
     script: row.script ?? undefined,
     variables: row.variables ?? {},
+    outputVariables: row.output_variables ?? undefined,
     status: row.status,
     recordingUrl: row.recording_url ?? undefined,
     detailsUrl: row.details_url ?? undefined,
     transcript: row.transcript ?? undefined,
     summary: row.summary ?? undefined,
     endedReason: row.ended_reason ?? undefined,
+    startedAt: row.started_at ?? undefined,
     durationSeconds: row.duration_seconds ?? undefined,
     successEvaluation: row.success_evaluation ?? undefined,
     structuredData: row.structured_data ?? undefined,
@@ -74,12 +78,14 @@ function toRow(call: Call): Record<string, unknown> {
     customer_email: call.customerEmail ?? null,
     script: call.script ?? null,
     variables: call.variables ?? {},
+    output_variables: call.outputVariables ?? null,
     status: call.status,
     recording_url: call.recordingUrl ?? null,
     details_url: call.detailsUrl ?? null,
     transcript: call.transcript ?? null,
     summary: call.summary ?? null,
     ended_reason: call.endedReason ?? null,
+    started_at: call.startedAt ?? null,
     duration_seconds: call.durationSeconds ?? null,
     success_evaluation: successEvaluation,
     structured_data: call.structuredData ?? null,
@@ -135,6 +141,18 @@ export class SupabaseCallRepository implements CallRepository {
       .eq('fonema_call_id', fonemaCallId)
       .maybeSingle();
     if (error) throw dbError('findByFonemaCallId', error);
+    return data ? toDomain(data as CallRow) : null;
+  }
+
+  async findLatestByPhoneNumber(phoneNumber: string): Promise<Call | null> {
+    const { data, error } = await this.db
+      .from(TABLE)
+      .select()
+      .eq('phone_number', phoneNumber)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw dbError('findLatestByPhoneNumber', error);
     return data ? toDomain(data as CallRow) : null;
   }
 }

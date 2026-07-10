@@ -108,6 +108,23 @@ Etapa `sales-calls` del pipeline: entre `file-matching` (viabilidad) y `power-ap
 - **Variables de entorno**: `FONEMA_API_URL`, `FONEMA_API_KEY`, `FONEMA_SALES_AGENT_ID` (+ Supabase para persistencia durable). `SEED_DEMO=true` carga una llamada de ejemplo en memoria.
 - **Endpoints**: base `/api/sales-calls` (ver OAS `public/docs/openapi.yaml`, tag *Sales Calls*).
 
+#### Persistencia de lo que devuelve Fonema (tabla `calls`)
+
+Toda la información de la llamada se persiste en `calls` para consumo posterior (`GET /calls`, `GET /calls/{id}`, handoff). Fuentes por evento:
+
+| Dato | Columna | Origen |
+|------|---------|--------|
+| Guion enviado | `script` | `POST /calls` / lead (entrada) |
+| Variables de entrada | `variables` | entrada (empresa, nit...) |
+| **Variables de salida** | `output_variables` | `variableValues` de `end-of-call`/`end-of-session` (merge acumulativo) |
+| Transcript (conversación) | `transcript` | `messages` de `end-of-call` |
+| Resumen / análisis | `summary`, `structured_data`, `success_evaluation` | `analysis` de `end-of-call`/`end-of-session` |
+| Grabación / detalle | `recording_url`, `details_url` | `end-of-call` (audio vía proxy `GET /calls/{id}/recording`) |
+| Tiempos y cierre | `started_at`, `duration_seconds`, `ended_reason`, `total_attempts` | `end-of-call` (+ `total_attempts` de `end-of-session`) |
+
+- **`end-of-session`** no trae `session.id` (solo teléfono): se correlaciona con la última llamada al número (`findLatestByPhoneNumber`) para no perder `total_attempts` ni el estado final de variables/análisis.
+- Columnas `output_variables`/`started_at` añadidas en migración `005_call_fonema_outputs.sql` (aplicada por CLI; ver *Arquitectura de datos*).
+
 ### Batch calling (campañas en `sales-calls`)
 
 Capa de campaña construida **sobre** `initiate-call` de Fonema (que no trae batch nativo), siguiendo el estado del arte de Vapi/Retell/Bland: subir lista + política de pacing → el backend encola en Supabase → un dispatcher *progressive* la drena → el cliente hace polling de agregados.
@@ -121,9 +138,11 @@ Capa de campaña construida **sobre** `initiate-call` de Fonema (que no trae bat
 
 ### Handoff a la Power App (`GET /calls/{id}/handoff`)
 
-Cuando una llamada cierra **calificada**, `BuildPowerAppPrefillUseCase` mapea su resultado (variables + `structuredData` del análisis + datos del lead) a un **prefill** con la forma de `SubmitPowerAppDto`. El contrato vive en `shared/contracts/power-app-prefill.ts` (`PowerAppPrefill`) para no acoplar features: `sales-calls` no importa internals de `power-apps`. El front consume el prefill, pre-diligencia el formulario y hace `POST /api/power-apps/submit`.
+Cuando una llamada cierra **calificada**, `BuildPowerAppPrefillUseCase` mapea su resultado a un **prefill** con la forma de `SubmitPowerAppDto`. El contrato vive en `shared/contracts/power-app-prefill.ts` (`PowerAppPrefill`) para no acoplar features: `sales-calls` no importa internals de `power-apps`. El front consume el prefill, pre-diligencia el formulario y hace `POST /api/power-apps/submit`.
 
-**Auto-avance del pipeline (automático al calificar).** El webhook `end-of-call` (`HandleCallWebhookUseCase`), tras persistir el resultado y sincronizar el item de campaña, si la llamada **califica** (`isCallQualified`: identidad verificada + interesado) y está correlacionada con un caso del pipeline (`caseId`), avanza **solo** `pipeline_cases.stage → power_apps` vía el contrato `PipelineStageAdvancer` (mismo patrón que `delivery-confirmation`). No radica la solicitud (eso exige adjuntos como el PDF de Cámara de Comercio y datos de entrega que la llamada no produce): solo mueve el caso a la etapa power_apps y deja el `handoff` listo para que el asesor complete y envíe. Es *best-effort* — un fallo o un caso ya avanzado (el advancer no permite retroceder) no rompe el webhook.
+**Cobertura del prefill (máxima).** Se mapea desde tres fuentes con prioridad creciente: variables de **entrada** (semilla de file-matching) < `structuredData` (análisis) < **variables de salida** (`outputVariables`, lo que el agente recolectó/confirmó en la llamada). Con eso se pre-poblan **todos** los campos de `SubmitPowerAppDto` salvo `archivosAdjuntos` (PDF Cámara de Comercio, que la llamada no produce): datos de empresa/tarjetahabiente/cupo, producto (`LATAM BUSINESS`/`NIT` fijos) y el bloque de **entrega** (`codigoOficinaCentroServicio`, `ciudadPuntoEntrega`, `direccionPuntoComercial`, `puntoEntrega` — este último normalizado desde lo que diga el agente, ej. "courier"→`ENVIO_CERTIFICADO_COURIER`). Cada campo usa alias de claves para tolerar cómo el agente nombre las variables en el dashboard de Fonema.
+
+**Auto-avance del pipeline (automático al calificar).** El webhook `end-of-call` (`HandleCallWebhookUseCase`), tras persistir el resultado y sincronizar el item de campaña, si la llamada **califica** (`isCallQualified`: identidad verificada + interesado) y está correlacionada con un caso del pipeline (`caseId`), avanza **solo** `pipeline_cases.stage → power_apps` vía el contrato `PipelineStageAdvancer` (mismo patrón que `delivery-confirmation`). No radica la solicitud (eso exige el adjunto PDF de Cámara de Comercio, que la llamada no produce): solo mueve el caso a la etapa power_apps y deja el `handoff` listo para que el asesor adjunte el PDF y envíe. Es *best-effort* — un fallo o un caso ya avanzado (el advancer no permite retroceder) no rompe el webhook.
 
 - **Correlación `caseId`**: se envía al disparar (`POST /calls` con `caseId`, o cada lead de `POST /batches` con `caseId`) y se persiste en `calls.case_id` / `call_batch_items.case_id` (migración `004_sales_call_case_link.sql`). Sin `caseId` no hay auto-avance (llamadas demo/manuales quedan igual: el handoff sigue disponible por `qualified`).
 

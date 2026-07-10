@@ -99,7 +99,13 @@ export class HandleCallWebhookUseCase {
     call.detailsUrl = payload.detailsURL ?? call.detailsUrl;
     call.transcript = payload.messages ?? call.transcript;
     call.endedReason = payload.endedReason ?? call.endedReason;
+    call.startedAt = payload.startedAt ?? call.startedAt;
     call.durationSeconds = payload.durationSeconds ?? call.durationSeconds;
+    // Variables de salida: lo que el agente recolectó/actualizó en la llamada.
+    // Se acumulan (merge) para no perder claves de eventos previos.
+    if (payload.variableValues) {
+      call.outputVariables = { ...call.outputVariables, ...payload.variableValues };
+    }
     call.summary = payload.analysis?.summary ?? call.summary;
     call.successEvaluation = payload.analysis?.successEvaluation ?? call.successEvaluation;
     call.structuredData = payload.analysis?.structuredData ?? call.structuredData;
@@ -132,13 +138,31 @@ export class HandleCallWebhookUseCase {
   }
 
   // Webhook "fin-de-sesion": se agotaron los reintentos hacia el cliente.
-  // Fonema NO envía session.id ni call.id en este evento (solo el teléfono),
-  // por lo que aún no es correlacionable de forma fiable con una llamada.
-  // La grabación/transcript ya llegan por fin-de-llamada; aquí solo se
-  // reconoce el evento. Correlacionar por teléfono requeriría indexar el
-  // repositorio por número (pendiente si se necesita este dato).
-  async handleEndOfSession(_payload: EndOfSessionPayload): Promise<void> {
-    return;
+  // Fonema NO envía session.id ni call.id (solo el teléfono), así que se
+  // correlaciona con la última llamada a ese número. Trae datos de cierre que
+  // el fin-de-llamada no tiene (totalAttempts) y el estado final de variables
+  // de salida / análisis; se persiste todo para poder consumirlo después.
+  async handleEndOfSession(payload: EndOfSessionPayload): Promise<void> {
+    const phoneNumber = payload.customer?.phoneNumber;
+    if (!phoneNumber) {
+      return;
+    }
+
+    const call = await this.callRepository.findLatestByPhoneNumber(phoneNumber);
+    if (!call) {
+      return;
+    }
+
+    if (payload.variableValues) {
+      call.outputVariables = { ...call.outputVariables, ...payload.variableValues };
+    }
+    call.totalAttempts = payload.totalAttempts ?? call.totalAttempts;
+    call.endedReason = payload.endedReason ?? call.endedReason;
+    call.successEvaluation = payload.analysis?.successEvaluation ?? call.successEvaluation;
+    call.structuredData = payload.analysis?.structuredData ?? call.structuredData;
+    call.updatedAt = new Date().toISOString();
+
+    await this.callRepository.save(call);
   }
 
   /**
