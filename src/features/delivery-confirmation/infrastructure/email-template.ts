@@ -1,4 +1,5 @@
 import type { DeliveryEmailPayload } from '../domain/email-sender.js';
+import { BANCO_BOGOTA_LOGO_BASE64_PNG } from './logo-base64.js';
 
 /** Asunto del correo de confirmación de entrega (cambia si es recordatorio). */
 export function buildDeliverySubject(isRetry: boolean): string {
@@ -33,9 +34,14 @@ export function buildDeliveryHtml(payload: DeliveryEmailPayload): string {
 <div style="background:${PAGE_BG}; padding:32px 16px; font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px; margin:0 auto; background:#ffffff; border:1px solid ${BORDER}; border-radius:16px; overflow:hidden;">
     <tr>
-      <td style="background:${PRIMARY}; padding:24px 32px;">
-        <p style="margin:0; color:#ffffff; font-size:18px; font-weight:700; letter-spacing:0.3px;">Banca Empresas</p>
-        <p style="margin:4px 0 0; color:${TINT}; font-size:13px;">Tarjeta de Crédito LATAM Business</p>
+      <td align="center" style="background:#ffffff; padding:24px 32px; border-bottom:3px solid ${PRIMARY};">
+        <img
+          src="data:image/png;base64,${BANCO_BOGOTA_LOGO_BASE64_PNG}"
+          width="140"
+          alt="Banco de Bogotá"
+          style="display:block; max-width:140px; height:auto;"
+        />
+        <p style="margin:10px 0 0; color:${BODY}; font-size:13px;">Tarjeta de Crédito LATAM Business</p>
       </td>
     </tr>
 
