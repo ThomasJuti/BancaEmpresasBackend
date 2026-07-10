@@ -76,6 +76,17 @@ export class BatchController {
         defaultVariables: parsed.data.defaultVariables,
       });
 
+      // Kickstart: dispara la cola de inmediato (respetando el pacing) en vez de
+      // esperar al cron diario. Best-effort: si falla, los items quedan en cola
+      // para el próximo tick del dispatcher.
+      try {
+        await this.deps.dispatchBatches.execute();
+      } catch (dispatchError) {
+        const message =
+          dispatchError instanceof Error ? dispatchError.message : 'unknown error';
+        console.error(`batch create: dispatch inmediato falló — ${message}`);
+      }
+
       res.status(201).json(batch);
     } catch (error) {
       next(error);
