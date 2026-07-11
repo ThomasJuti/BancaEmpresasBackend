@@ -7,7 +7,6 @@ import type { HandleCallWebhookUseCase } from '../application/HandleCallWebhookU
 import type { InitiateCallUseCase } from '../application/InitiateCallUseCase.js';
 import type { ListCallsUseCase } from '../application/ListCallsUseCase.js';
 import type { RegisterManualCallUseCase } from '../application/RegisterManualCallUseCase.js';
-import type { SyncQualifiedCallPipelineUseCase } from '../application/SyncQualifiedCallPipelineUseCase.js';
 
 const initiateCallSchema = z.object({
   caseId: z.string().uuid().optional(),
@@ -45,7 +44,6 @@ export class CallController {
     private readonly registerManualCallUseCase: RegisterManualCallUseCase,
     private readonly getCallRecordingUseCase: GetCallRecordingUseCase,
     private readonly handleCallWebhookUseCase: HandleCallWebhookUseCase,
-    private readonly syncQualifiedCallPipelineUseCase: SyncQualifiedCallPipelineUseCase,
   ) {}
 
   initiate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -90,15 +88,6 @@ export class CallController {
         throw new NotFoundError('Llamada no encontrada');
       }
       res.json(call);
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  syncPipeline = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const result = await this.syncQualifiedCallPipelineUseCase.execute(String(req.params.id));
-      res.json(result);
     } catch (error) {
       next(error);
     }

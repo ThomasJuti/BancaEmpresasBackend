@@ -19,7 +19,6 @@ info:
     | `GET` | `/api/sales-calls/calls/{id}` | Detalle de una llamada (transcript, análisis) |
     | `GET` | `/api/sales-calls/calls/{id}/recording` | Proxy de la grabación de audio (con Range) |
     | `GET` | `/api/sales-calls/calls/{id}/handoff` | Prefill para la Power App de una llamada calificada |
-    | `POST` | `/api/sales-calls/calls/{id}/sync-pipeline` | Recuperación: avanza a power_apps si la llamada calificó |
     | `POST` | `/api/sales-calls/batches` | Crear campaña (batch calling) con política de pacing |
     | `GET` | `/api/sales-calls/batches` | Listar campañas |
     | `GET` | `/api/sales-calls/batches/{id}` | Progreso agregado de una campaña (polling) |
@@ -690,57 +689,6 @@ paths:
                 $ref: '#/components/schemas/PowerAppPrefill'
         '404':
           description: Llamada inexistente o no calificada
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /api/sales-calls/calls/{id}/sync-pipeline:
-    post:
-      tags: [Sales Calls]
-      summary: Sincronizar pipeline tras llamada calificada
-      description: |
-        Recuperación idempotente: si la llamada está calificada y el caso aún no llegó
-        a `power_apps`, asegura `caseId` (por NIT si faltaba) y avanza
-        `pipeline_cases.stage → power_apps`. Útil cuando el webhook no correlacionó
-        o el front detecta desincronización UI vs Supabase.
-      operationId: syncCallPipeline
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Resultado del sync (advanced o alreadyAtOrPastPowerApps)
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [callId, caseId, stage, advanced, alreadyAtOrPastPowerApps]
-                properties:
-                  callId:
-                    type: string
-                    format: uuid
-                  caseId:
-                    type: string
-                    format: uuid
-                  stage:
-                    type: string
-                  advanced:
-                    type: boolean
-                  alreadyAtOrPastPowerApps:
-                    type: boolean
-        '400':
-          description: Llamada no calificada o sin NIT/caseId
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Llamada no encontrada
           content:
             application/json:
               schema:

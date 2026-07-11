@@ -28,7 +28,6 @@ function getControllers(): Controllers {
       deps.registerManualCall,
       deps.getRecording,
       deps.handleWebhook,
-      deps.syncQualifiedCallPipeline,
     ),
     batch: new BatchController(deps),
   };
@@ -62,7 +61,6 @@ salesCallsRouter.get('/calls', route((c) => c.call.list));
 salesCallsRouter.get('/calls/:id', route((c) => c.call.get));
 salesCallsRouter.get('/calls/:id/recording', route((c) => c.call.recording));
 salesCallsRouter.get('/calls/:id/handoff', route((c) => c.batch.handoff));
-salesCallsRouter.post('/calls/:id/sync-pipeline', route((c) => c.call.syncPipeline));
 
 // Campañas (batch calling)
 salesCallsRouter.post('/batches', route((c) => c.batch.create));

@@ -22,7 +22,6 @@ import {
 import { ListCallsUseCase } from '../application/ListCallsUseCase.js';
 import { RegisterManualCallUseCase } from '../application/RegisterManualCallUseCase.js';
 import { SetBatchStatusUseCase } from '../application/SetBatchStatusUseCase.js';
-import { SyncQualifiedCallPipelineUseCase } from '../application/SyncQualifiedCallPipelineUseCase.js';
 import type { CallBatchRepository } from '../domain/CallBatchRepository.js';
 import type { CallRepository } from '../domain/CallRepository.js';
 import type { FonemaGateway } from '../domain/FonemaGateway.js';
@@ -40,7 +39,6 @@ export interface SalesCallsDeps {
   registerManualCall: RegisterManualCallUseCase;
   getRecording: GetCallRecordingUseCase;
   handleWebhook: HandleCallWebhookUseCase;
-  syncQualifiedCallPipeline: SyncQualifiedCallPipelineUseCase;
   createBatch: CreateCallBatchUseCase;
   dispatchBatches: DispatchCallBatchesUseCase;
   getBatch: GetCallBatchUseCase;
@@ -75,7 +73,6 @@ export function getSalesCallsDeps(): SalesCallsDeps {
     fonemaGateway,
     callRepository,
     env.fonema.salesAgentId,
-    pipelineCases,
   );
 
   deps = {
@@ -94,12 +91,6 @@ export function getSalesCallsDeps(): SalesCallsDeps {
     handleWebhook: new HandleCallWebhookUseCase(
       callRepository,
       batchRepository,
-      pipelineAdvancer,
-      pipelineCases,
-    ),
-    syncQualifiedCallPipeline: new SyncQualifiedCallPipelineUseCase(
-      callRepository,
-      pipelineCases,
       pipelineAdvancer,
     ),
     createBatch: new CreateCallBatchUseCase(batchRepository, env.fonema.salesAgentId),
@@ -148,12 +139,10 @@ class FonemaFollowUpCallService implements FollowUpCallService {
       );
     }
 
-    const db = getSupabaseClient();
     this.initiateCall = new InitiateCallUseCase(
       new FonemaHttpGateway(env.fonema.apiUrl, env.fonema.followUpApiKey),
-      new SupabaseCallRepository(db),
+      new SupabaseCallRepository(getSupabaseClient()),
       env.fonema.followUpAgentId,
-      new SupabasePipelineCaseRepository(db),
     );
     return this.initiateCall;
   }

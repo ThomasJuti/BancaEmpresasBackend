@@ -1,5 +1,3 @@
-import { normalizeLeadId } from '../../../core/pipeline/domain/normalize-lead-id.js';
-import type { PipelineCaseRepository } from '../../../core/pipeline/domain/pipeline-case.repository.js';
 import type { PipelineStageAdvancer } from '../../../shared/contracts/pipeline.js';
 import type { Call, CallStatus, TranscriptMessage } from '../domain/Call.js';
 import type { CallRepository } from '../domain/CallRepository.js';
@@ -54,8 +52,6 @@ export class HandleCallWebhookUseCase {
     // Opcional: avanza el caso a power_apps cuando la llamada califica.
     // Ausente en seed/demo sin pipeline durable.
     private readonly pipeline?: PipelineStageAdvancer,
-    // Opcional: resuelve caseId desde NIT cuando la llamada no lo traía.
-    private readonly pipelineCases?: PipelineCaseRepository,
   ) {}
 
   // Webhook "actualizaciones-de-llamada": cambios de estado en tiempo real.
@@ -128,49 +124,16 @@ export class HandleCallWebhookUseCase {
    *
    * Best-effort: un fallo aquí (o un caso ya avanzado, que el advancer rechaza por
    * no retroceder) no debe romper el webhook — la grabación/resultado ya se guardó.
-   *
-   * Si falta caseId pero hay NIT en variables, se asegura el caso del pipeline
-   * (repara llamadas históricas iniciadas sin caseId).
    */
   private async advancePipelineIfQualified(call: Call): Promise<void> {
-    if (!this.pipeline) return;
+    if (!this.pipeline || !call.caseId) return;
     if (!isCallQualified(call)) return;
 
-    const caseId = await this.resolveCaseId(call);
-    if (!caseId) return;
-
     try {
-      await this.pipeline.advance(caseId, 'power_apps');
+      await this.pipeline.advance(call.caseId, 'power_apps');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown error';
-      console.warn(`sales-calls: auto-avance a power_apps omitido (caso ${caseId}) — ${message}`);
-    }
-  }
-
-  /**
-   * Resuelve caseId: usa el de la llamada o, si falta, asegura el caso por NIT
-   * y lo persiste en la llamada para correlaciones futuras.
-   */
-  private async resolveCaseId(call: Call): Promise<string | undefined> {
-    if (call.caseId) {
-      return call.caseId;
-    }
-
-    const nit = call.variables?.['nit']?.trim();
-    if (!this.pipelineCases || !nit) {
-      return undefined;
-    }
-
-    try {
-      const pipelineCase = await this.pipelineCases.ensureByLeadId(normalizeLeadId(nit));
-      call.caseId = pipelineCase.id;
-      call.updatedAt = new Date().toISOString();
-      await this.callRepository.save(call);
-      return pipelineCase.id;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'unknown error';
-      console.warn(`sales-calls: no se pudo resolver caseId por NIT ${nit} — ${message}`);
-      return undefined;
+      console.warn(`sales-calls: auto-avance a power_apps omitido (caso ${call.caseId}) — ${message}`);
     }
   }
 
@@ -200,8 +163,6 @@ export class HandleCallWebhookUseCase {
     call.updatedAt = new Date().toISOString();
 
     await this.callRepository.save(call);
-    // Si el análisis llega aquí (y no en end-of-call), también intentamos avanzar.
-    await this.advancePipelineIfQualified(call);
   }
 
   /**
