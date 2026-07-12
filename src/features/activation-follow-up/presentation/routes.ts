@@ -28,6 +28,12 @@ export function createActivationFollowUpRouter(followUpCalls: FollowUpCallServic
 
   router.get('/cases', (req, res) => getController().listCases(req, res));
   router.post('/cases', (req, res) => getController().finalizeDelivery(req, res));
+  // Disparo del procesador desde la app (botón "Actualizar" de Seguimiento).
+  // No lleva secreto como el cron: la propia cadencia (isReminderDue +
+  // lastReminderAt) evita reenvíos, así que no puede spamear a un cliente.
+  router.post('/cases/process-reminders', (req, res) =>
+    getController().processReminders(req, res),
+  );
   router.post('/cases/:clienteId/usage', (req, res) => getController().registerUsage(req, res));
 
   router.get('/cron/process-reminders', verifyCronSecret, (req, res) =>

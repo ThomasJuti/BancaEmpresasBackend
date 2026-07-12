@@ -18,7 +18,10 @@ const INTERVALO_MES_3 = 7;
 
 export function diasSinUso(caso: FollowUpCase, now: Date, dayMs: number): number {
   const elapsed = now.getTime() - new Date(caso.lastUsedAt).getTime();
-  return Math.floor(Math.max(0, elapsed) / dayMs);
+  const dias = Math.floor(Math.max(0, elapsed) / dayMs);
+  // La TC se inactiva a los 90 días sin uso: el contador se topa ahí (no tiene
+  // sentido de negocio contar más allá de la inactivación).
+  return Math.min(DIA_INACTIVACION, dias);
 }
 
 export function faseDe(dias: number): FollowUpFase {
