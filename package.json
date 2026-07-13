@@ -11,6 +11,8 @@
     "compile": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "seed": "tsx scripts/seed-from-excel.ts",
     "demo:delivery": "tsx scripts/e2e-demo.ts"
   },
@@ -32,9 +34,11 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.1.1",
     "@types/nodemailer": "^8.0.1",
+    "@vitest/coverage-v8": "^4.1.10",
     "exceljs": "^4.4.0",
     "tsx": "^4.23.0",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.10"
   },
   "overrides": {
     "exceljs": {
